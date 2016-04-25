@@ -1,0 +1,33 @@
+
+#+TITLE:Cross-Map Development Todo List 
+
+
+
+- [-] Persistent Cross Map
+  - [X] CLJ version
+    - [X] Stubs
+    - [X] Port implementation
+  - [ ] CLJS version
+    - [ ] Stubs 
+    - [ ] Make separate implementation based on PersistentHashMap
+  - [ ] Test
+    - [ ] Write comprehensive tests
+      - [ ] Include tests with pair-indices
+      - [ ] Include tests with non-pair indices
+    - [ ] Test on both CLJ and CLJS platforms
+
+
+* Test-Map as Row/Column Table
+  | / | :a | :b | :c | :d | :e | :f | :g | :h | :i | :j |
+  |---+----+----+----+----+----+----+----+----+----+----|
+  | 0 |    |    |    |    |    |    |    |    |    |    |
+  | 1 |    |    |    |    |    |    |    |    |    |    |
+  | 2 |    |    |    |    |    |    |    |    |    |    |
+  | 3 |    |    |    |    |    |    |    |    |    |    |
+  | 4 |    |    |    |    |    |    |    |    |    |    |
+  | 5 |    |    |    |    |    |    |    |    |    |    |
+  | 6 |    |    |    |    |    |    |    |    |    |    |
+  | 7 |    |    |    |    |    |    |    |    |    |    |
+  | 8 |    |    |    |    |    |    |    |    |    |    |
+  | 9 |    |    |    |    |    |    |    |    |    |    |
+
