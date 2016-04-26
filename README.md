@@ -51,8 +51,8 @@ implemented as part of the update cycle, as opposed to CSP
 
 Both System functions and CSP channels are bound to "component
 profiles".  These are specifications of which components are necessary
-for that system to run.  (Binding components to a subset of entity
-ID's will also be supported).
+for that system to run.  (Binding to a subset of entity ID's will also
+be supported).
 
 For instance, an "update-velocity" system may only be executed on an
 entity with both a Position component and a Velocity component.  It
