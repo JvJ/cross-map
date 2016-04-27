@@ -1,7 +1,7 @@
 # cross-map
 
-Cross-map is an implementation of a Persistent corresponding Transient
-map for both Clojure and ClojureScript.
+Cross-map is an implementation of a Persistent map and corresponding
+Transient map for both Clojure and ClojureScript.
 
 It is designed specifically for maps with keys that are [row col]
 pairs, and which will typically represent sparse matrices (although it
