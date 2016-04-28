@@ -1,6 +1,7 @@
 (ns cross-map.core-test
   (:require [clojure.test :refer :all]
-            [cross-map.core :refer :all]))
+            [cross-map.core :refer :all]
+            [criterium.core :refer [bench]]))
 
 
 ;;;; A test-map that we can use for cross-referencing!
@@ -20,3 +21,27 @@
          [[row (keyword col)] (keyword (str row "_" col))])
        (shuffle)
        (take num-keep)))
+
+(defn volatile-test
+  "Just checking that running pmap on lazy
+  sequences that use volatile variables."
+  [num-syms bench?]
+  (letfn [(idx-zip [coll]
+            (let [i (volatile! -1)]
+              (for [c coll]
+                [c (vswap! i inc)])))
+          
+          (dummy-func [[sym n]]
+            (let [[_ s] (re-find #"G__(\d)+" (name sym))
+                  m (read-string s)]
+              (reduce + (range (* n m)))))]
+    (let [syms (repeatedly num-syms gensym)
+          sym-idx (idx-zip syms)
+          p-sums (pmap dummy-func sym-idx)
+          sums (map dummy-func sym-idx)
+          ]
+      (when bench?
+        (bench (reduce conj [] p-sums))
+        (bench (reduce conj [] sums)))
+      (is (= p-sums
+             sums)))))

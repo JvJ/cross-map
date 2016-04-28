@@ -9,6 +9,15 @@
   (and (vector? v)
        (= (count v) 2)))
 
+;;; Memoization using volatiles.  Avoids the overhead for single-threaded uses.
+(defn vmemo [f]
+  (let [mem (volatile! {})]
+    (fn [& args]
+      (or (@mem args)
+          (let [ret (apply f args)]
+            (vswap! mem ret)
+            ret)))))
+
 ;;; Map utility functions
 (defn dissoc-in
   "Dissociates an entry from a nested associative structure returning a new

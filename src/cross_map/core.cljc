@@ -2,7 +2,7 @@
   "Defines operations on the cross-map data structure."
 
   (:require [cross-map.util :as u
-             :refer [pair? dissoc-in]])
+             :refer [pair? dissoc-in vmemo]])
   
   ;; Clojure-specific imports of java interfaces
   ;; to implement
@@ -32,9 +32,77 @@
   (rows [this] "A map representing all rows.  A map of {row->{col->element}}.")
   (cols [this] "A map representing all colums.  A map of {col->{row->element}}")
   (crossIndexRows [this r-keys opts] "Full-map cross-section by row-first.")
-  (crossIndexColumns [this c-keys opts] "Full-map cross-section by col-first.")
+  (crossIndexCols [this c-keys opts] "Full-map cross-section by col-first.")
   (crossIndex [this r-keys c-keys opts] "Cross section of elements in all specified rows and all specified columns."))
 
+(defn- cross-index-helper
+  "crossIndexRows and crossIndexColumns are the same if you switch
+  around instances of rowIdx and colIdx.  Pass in true to rows? to
+  iterate over rows.  False to iterate over columns.
+
+  Explanation of the keyword params:
+  (TODO)"
+  [this rows? selected-keys
+   {:keys [every any keys-only vals-only] :as opts}]
+  (let [_ (and any every
+               (throw (Exception.
+                       (if rows?
+                         ":any-row and :every-row cannot both be specified."
+                         ":any-col and :every-col cannot both be specified."))))
+        opts (disj opts :any :every)
+        _ (if (or (and keys-only vals-only)
+                  (and keys-only vals-only))
+            (throw (Exception. (str "Invalid key/value options: " opts))))
+        opts (disj opts :keys-only :vals-only)
+        _ (if-not (empty? opts)
+            (throw (Exception. (str "Unsupported options: " opts))))
+
+        rowIdx (.rowIdx this)
+        colIdx (.colIdx this)
+
+        ;; The primary and secondary iteration dimensions - row or column
+        [pri sec] (if rows? [rowIdx colIdx] [colIdx rowIdx])
+        
+        ;; Default options
+        no-keys (empty? selected-keys)
+        every (and (not no-keys)
+                   (or every (not any)))
+        selected-keys (or (seq selected-keys) (keys pri))
+        kv-mode (or keys-only vals-only)
+        
+
+        ;; List predicate for checking valid entries
+        valid? (cond every every?
+                     :else some)
+        
+
+        
+        ;; Pairs of [pri-key sec-key]
+        ps-keys (cond
+                  ;; If we're going by entries, things are a little more
+                  ;; straightforward
+                  ;; Select smallest pri for "every"
+                  every (let [min-pk (apply min-key #(count (pri %))
+                                            (or (seq selected-keys)
+                                                (keys pri)))]
+                          (for [sk (keys (pri min-pk))]
+                            [min-pk sk]))
+                  ;; Select all pri for any
+                  :else (for [pk selected-keys
+                              sk (keys (pri pk))]
+                          [pk sk]))
+
+        ;; An accumulator, for efficiency.  Only used in "any" case
+        tags-v (if-not every (volatile! (transient #{})))]
+    (for [[pk sk] ps-keys 
+          :when (and (or (and tags-v (not (@tags-v sk)))
+                         every)
+                     (valid? (sec sk) selected-keys))
+          :let [_ (and tags-v (vswap! tags-v conj! sk))]]
+      (case kv-mode
+        :keys-only sk
+        :vals-only (sec sk)
+        [sk (sec sk)]))))
 
 ;;;; CLJ Implementation
 #?(:clj
@@ -134,19 +202,48 @@
      (col [this c-key] (colIdx c-key))
      (rows [this] rowIdx)
      (cols [this] colIdx)
-     (crossIndexRows [this r-keys {:keys [any-row every-row] :as opts}]
-       (if (and any-row every-row)
-         (throw (Exception.
-                 ":any-row and :every-row cannot both be present.")))
-       (loop [[r & rs :as rows] (if-not (empty? row-keys)
-                                  (sort-by #(count (rowIdx %)) row-keys)
-                                  (keys rowIdx))
-              tagged #{}]
-         ;; LEFTOFF: Figure this out
-         (lazy-seq (or (and every-row
-                            (every? #((rowIdx r) %) ))))))
-     (crossIndexColumns [this c-keys opts])
-     (crossIndex [this r-keys c-keys opts])
+     (crossIndexRows [this r-keys
+                      {:keys [any every
+                              any-row every-row
+                              keys-only vals-only] :as opts}]
+       (cross-index-helper this true r-keys
+                           (-> opts
+                               (disj :any-row :every-row)
+                               (conj (and any-row :any)
+                                     (and every-row :every))
+                               (disj nil))))
+     (crossIndexCols [this c-keys
+                         {:keys [any every
+                                 any-col every-col
+                                 keys-only vals-only] :as opts}]
+       (cross-index-helper this false c-keys
+                           (-> opts
+                               (disj :any-col :every-col)
+                               (conj (and any-col :any)
+                                     (and every-col :every))
+                               (disj nil))))
+     
+     (crossIndex [this r-keys c-keys
+                  {:keys [any-row every-row
+                          any-col every-col
+                          keys-only vals-only
+                          by-rows by-cols] :as opts}]
+       (let [;; LEFTOFF: Error checking params, and continue
+
+             ;; Doing a quick little memoization with volatiles
+             ;; instead of atoms.
+
+             checkfn (fn [f coll]
+                       (let [v (volatile! (transient {}))]
+                         (fn [k]
+                           (or (@v k)
+                               (let [ret (f k coll)]
+                                 (vswap! assoc! k ret))))))
+             [pri sec] (if by-rows [rowIdx colIdx] [colIdx rowIdx] )
+             valid-row? (checkfn (if every-row every? some)
+                                 rows)
+             valid-col? (checkn (if every-row every? some)
+                                rows)]))
      
      #_IEditableCollection ; For turning this into a transient structure
      #_(asTransient [this]
