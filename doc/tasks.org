@@ -4,9 +4,12 @@
 
 
 - [-] Persistent Cross Map
+  - [ ] API wrappers
   - [X] CLJ version
     - [X] Stubs
     - [X] Port implementation
+    - [X] crossIndexRows and crossIndexColumns
+    - [X] row-column cross-indexing
   - [ ] CLJS version
     - [ ] Stubs 
     - [ ] Make separate implementation based on PersistentHashMap
@@ -15,6 +18,8 @@
       - [ ] Include tests with pair-indices
       - [ ] Include tests with non-pair indices
     - [ ] Test on both CLJ and CLJS platforms
+  - [ ] MISC:
+    - [ ] Introduce cross-platform error function/macro in util
 
 
 * Test-Map as Row/Column Table
@@ -31,3 +36,4 @@
   | 8 |    |    |    |    |    |    |    |    |    |    |
   | 9 |    |    |    |    |    |    |    |    |    |    |
 
+** Expected results from operations

@@ -3,6 +3,12 @@
             [cross-map.core :refer :all]
             [criterium.core :refer [bench]]))
 
+(def ^:dynamic *benchmarking* false)
+
+(defmacro with-benchmarking
+  [& body]
+  `(binding [*benchmarking* true]
+     ~@body))
 
 ;;;; A test-map that we can use for cross-referencing!
 (def alphabet (map char (range (int \a) (inc (int \z)))))
@@ -13,14 +19,26 @@
 
   Keep in mind that num-cols won't go to more than 26, since
   the columns are labelled by the letters of the alphabet."
-  [num-rows num-cols num-keep]
-  (->> (for [row (range num-rows)
-             col (->> alphabet
-                      (map str)
-                      (take num-cols))]
-         [[row (keyword col)] (keyword (str row "_" col))])
+  [row-seq col-seq num-rows num-cols num-keep]
+  (->> (for [row (take num-rows row-seq)
+             col (take num-cols col-seq)]
+         [[row col] (keyword (str row "_" col))])
        (shuffle)
        (take num-keep)))
+
+(deftest cross-test
+  ;; LEFTOFF: Develop extensive tests!!
+  (let [;; We're doing a *big* test here.  Assuming
+        ;; 10,000 rows with 100 cols
+        syms (repeatedly gensym)
+        test-syms (take 10 syms)
+        _ (println "startin out with test-sims: " test-syms)
+        pairs (gen-grid-pairs (range) syms 10000 100 300000)
+        _ (println "bein cool")
+        cmap (into (cross-map) pairs)
+        _ (println "map is here with " (count cmap) " elements")
+        col-cross (cross-cols cmap (take 2 test-syms))]
+    (println "Cross count: " (count col-cross))))
 
 (defn volatile-test
   "Just checking that running pmap on lazy

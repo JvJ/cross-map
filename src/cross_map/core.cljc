@@ -50,9 +50,8 @@
                          ":any-row and :every-row cannot both be specified."
                          ":any-col and :every-col cannot both be specified."))))
         opts (disj opts :any :every)
-        _ (if (or (and keys-only vals-only)
-                  (and keys-only vals-only))
-            (throw (Exception. (str "Invalid key/value options: " opts))))
+        _ (and keys-only vals-only   
+               (throw (Exception. (str "Invalid key/value options: " opts))))
         opts (disj opts :keys-only :vals-only)
         _ (if-not (empty? opts)
             (throw (Exception. (str "Unsupported options: " opts))))
@@ -74,9 +73,7 @@
         ;; List predicate for checking valid entries
         valid? (cond every every?
                      :else some)
-        
-
-        
+                
         ;; Pairs of [pri-key sec-key]
         ps-keys (cond
                   ;; If we're going by entries, things are a little more
@@ -228,22 +225,69 @@
                           any-col every-col
                           keys-only vals-only
                           by-rows by-cols] :as opts}]
-       (let [;; LEFTOFF: Error checking params, and continue
-
+       (let [_ (and every-row any-row
+                    (throw (Exception. "Cannot specify both :any-row and :every-row.")))
+             opts (disj opts :any-row :every-row)
+             _ (and every-col any-col
+                    (throw (Exception. "Cannot specify both :any-col and :every-col.")))
+             opts (disj opts :any-col :every-col)
+             _ (and keys-only vals-only
+                    (throw (Exception. "Cannot specify both :keys-only and :vals-only.")))
+             opts (disj opts :keys-only :vals-only)
+             _ (and by-rows by-cols
+                    (throw (Exception. "Cannot specify both :by-rows and :by-cols.")))
+             opts (disj opts :by-rows :by-cols)
+             _ (if-not (empty? opts)
+                 (throw (Exception. (str "Unsupported options: " opts))))
+             
              ;; Doing a quick little memoization with volatiles
-             ;; instead of atoms.
-
+             ;; instead of atoms. #ThugLife #BreakingTheLaw
              checkfn (fn [f coll]
                        (let [v (volatile! (transient {}))]
                          (fn [k]
                            (or (@v k)
                                (let [ret (f k coll)]
-                                 (vswap! assoc! k ret))))))
-             [pri sec] (if by-rows [rowIdx colIdx] [colIdx rowIdx] )
-             valid-row? (checkfn (if every-row every? some)
-                                 rows)
-             valid-col? (checkn (if every-row every? some)
-                                rows)]))
+                                 (vswap! v assoc! k ret)
+                                 ret)))))
+
+             by-rows (or by-rows (not by-cols))
+             
+             [pri every-pri any-pri pri-keys
+              sec every-sec any-sec sec-keys]
+             (if by-rows
+               [rowIdx every-row any-row r-keys
+                colIdx every-col any-col c-keys]
+               [colIdx every-col any-col c-keys
+                rowIdx every-row any-row r-keys])
+
+             ;; (every? ()) is always true,
+             ;; so we can treat it as (some <all-keys>)
+             [every-pri pri-keys] (if (and (empty? pri-keys)
+                                           (or every-pri (not any-pri)))
+                                    [false (keys pri)]
+                                    [every-pri pri-keys])
+             [every-sec sec-keys] (if (and (empty? sec-keys)
+                                           (or every-sec (not any-sec)))
+                                    [false (keys sec)]
+                                    [every-sec sec-keys])
+
+             ;; A valid column must check all/any rows
+             valid-pri? (checkfn (if every-sec
+                                   #(and (pri %1) (every? (pri %1) %2))
+                                   #(and (pri %1) (some (pri %1) %2)))
+                                 sec-keys)
+
+             ;; A valid row must check all/any columns
+             valid-sec? (checkfn (if every-pri
+                                   #(and (sec %1) (every? (sec %1) %2))
+                                   #(and (sec %1) (some (sec %1) %2)))
+                                 pri-keys)]
+         (for [pk pri-keys
+               :when (valid-pri? pk)
+               sk sec-keys
+               :let [entry (find mainMap [pk sk])]
+               :when (and entry (valid-sec? sk))]
+           entry)))
      
      #_IEditableCollection ; For turning this into a transient structure
      #_(asTransient [this]
@@ -391,23 +435,20 @@
   (TransientCrossMap. !mainMap !rowIdx !colIdx))
 
 ;;;; API - shared across platforms
-(defn cross-r
-  "Cross-section of a cross-map by rows.  A sequence of all
-  elements that are in all specified rows.  These are key-value
-  pairs of [[row col]->Element]."
-  [cm r-keys]
-  (crossIndex cm r-keys () #{}))
+(defn cross-rows
+  [cm r-keys & opts]
+  (crossIndexRows cm r-keys (set opts)))
 
-(defn cross-c
-  "Cross-section of a cross-map by columns.  A sequence of all
-  elements that are in all specified columns.  These are key-value
-  pairs of [[row col]->Element]."
-  [cm c-keys]
-  (crossIndex cm () c-keys #{}))
+(defn cross-cols
+  [cm c-keys & opts]
+  (crossIndexCols cm c-keys (set opts)))
+
+(defn cross
+  [cm r-keys c-keys & opts]
+  (crossIndex cm r-keys c-keys (set opts)))
 
 (defn cross-map
   "Create a cross-map with any number of entries."
   [& {:as kvps}]
   (into (PersistentCrossMap. {} {} {})
         kvps))
-
