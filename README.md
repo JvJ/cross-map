@@ -6,31 +6,97 @@ Transient map for both Clojure and ClojureScript.
 It is designed specifically for maps with keys that are [row col]
 pairs, and which will typically represent sparse matrices (although it
 represents dense matrices just as well).  Despite this, it supports
-all operations supported by the default Clojure maps, and in most
-cases will act just like any other Clojure map (with some small
-overhead).
+all types of keys -- it's just that only [row col] pairs will be
+cross-indexed.  In most cases it can act just like any other Clojure map
+(with some small overhead for cross-indexing).
 
 The cross-map is designed such that any key of the form [row col] will
 be cross-referenced in a row-index as well as a column-index.  This
 way, accessing specific rows and columns can be done efficiently,
-without the need for filter operations.
+without the need for O(n) filter operations.  They will typically
+be O(r) or O(c), where r and c are the numbers of rows and columns
+respectively.
+
+## Cross-indexing
 
 As an example, take the following map:
 
-{[:a 1] :A1, [:a 2] :A2, [:b 1] :B1, [:a 3] :A3, [:c 1] :C1}
+(def c-map (cross-map [:a 1] :A1, [:a 2] :A2, [:b 1] :B1, [:a 3] :A3, [:c 1] :C1))
+=> {[:a 1] :A1, [:a 2] :A2, [:b 1] :B1, [:a 3] :A3, [:c 1] :C1}
 
-A cross-map representation of this map will have the following
-row-index and col-index:
+As you can see, it looks like any other persistent map.  However,
+a this cross-map will have the following row index and column index:
 
-row-index: {:a {1 :A1, 2 :A2, 3 :A3}, :b {1 :B1}, :c {1 :C1}}
-col-index: {1 {:a :A1, :b :B1, :c :C1}, 2 {:a :A2}, 3 {:a :A3}}
+(.rowIdx c-map) => {:a {1 :A1, 2 :A2, 3 :A3}, :b {1 :B1}, :c {1 :C1}}
+(.colIdx c-map) => {1 {:a :A1, :b :B1, :c :C1}, 2 {:a :A2}, 3 {:a :A3}}
 
 Removing, adding, and/or updating elements in the main map will be
 mirrored in both the row-index and the col-index.
 
-This enables iteration over associative maps that represent entire
-rows or columns, without the overhead of iterating through the map,
-filtering, and building up an intermediate structure.
+For instance, let's associate a new entry:
+(def c-map2 (assoc c-map [:c 3] :C3))
+=> {[:a 1] :A1, [:a 2] :A2, [:b 1] :B1, [:a 3] :A3, [:c 1] :C1, [:c 3] :C3}
+
+We get what we would expect from any associative map.  But the row and
+column indies are also updated:
+
+(.rowIdx c-map2) => {:a {1 :A1, 2 :A2, 3 :A3}, :b {1 :B1}, :c {1 :C1, 3 :C3}}
+(.colIdx c-map2) => {1 {:a :A1, :b :B1, :c :C1}, 2 {:a :A2}, 3 {:a :A3, :c :C3}}
+
+Internally, this is achieved by maintaining three maps - the main map, the row
+index and the column index.  They are updated something like this:
+
+(assoc mainMap [:c 3] :C3)
+(assoc-in rowIdx [:c 3] :C3)
+(assoc-in colIdx [3 :c] :C3)
+
+## The Cross operations
+
+The cross-indexing enables iteration over associative maps that represent entire
+rows or columns, without the overhead of iterating through the map, filtering,
+and building up an intermediate structure.
+
+Three operations are supported:
+* cross
+..* args: [row-keys col-keys & opts]
+..* Returns a lazy sequence of [[r c] val] entries that match specifications.
+* cross-rows
+..* args: [row-keys & opts]
+..* Returns a lazy sequence of [c column-map] entries, where column-map represents
+    the entire column c, and these entries match specifications.
+* cross-cols
+..* args: [col-keys & opts]
+..* Returns a lazy sequence of [r row-map] entries, where column-map represents
+    the entire column r, and these entries match specifications.
+
+Options are as follows:
+* :any-row
+..* Columns returned will have an entry in at least one of the specified rows.
+    (Not valid in cross-cols)
+* :every-row
+..* Columns returned will have entires in all of the specified rows.
+    (Not valid in cross-cols)
+* :any-col
+..* Rows returned will have an entry in at least one of the specified columns.
+    (Not valid in cross-rows)
+* :every-col
+..* Rows returned will have entries in all of the specified columns.
+    (Not valid in cross-rows)
+* :keys-only
+..* Return only the keys that match.  Keys are [r c] for cross, c for cross-rows
+    and r for cross-cols.
+* :vals-only
+..* Return only the values that match.  Values are individual entries for cross,
+    entire columns for cross-rows, and entire rows for cross-cols.
+* :by-rows
+..* The sequence is ordered row-first.  (Only valid in cross) 
+* :by-cols
+..* The sequence is ordered column-first. (Only valid in cross)
+
+Default options, if no options are specified:
+* :every-row and :every-col over :any-row and :any-col
+* Neither :keys-only or :vals-only.  Key-value pairs are returned.
+* :by-rows over :by-cols
 
 ## Motivation
 
