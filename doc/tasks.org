@@ -4,22 +4,43 @@
 
 
 - [-] Persistent Cross Map
-  - [ ] API wrappers
-  - [X] CLJ version
+
+  - [-]  Cross-platform:
+    - [X] API wrappers
+    - [ ] Introduce cross-platform error function/macro in util
+    - [X] Create helper function for cross-rows and cross-cols
+    - [ ] Create a helper function for double-cross
+    - [ ] Transient helper functions (if necessary)
+  - [-] CLJ version
     - [X] Stubs
     - [X] Port implementation
     - [X] crossIndexRows and crossIndexColumns
     - [X] row-column cross-indexing
-  - [ ] CLJS version
-    - [ ] Stubs 
+    - [ ] Transient implementation
+  - [-] CLJS version
+    - [X] Stubs 
     - [ ] Make separate implementation based on PersistentHashMap
-  - [ ] Test
-    - [ ] Write comprehensive tests
+    - [ ] Transient implementation
+  - [-] Test
+    - [-] Write comprehensive tests
+      - [X] Write a slow function to produce the same output as crosing
       - [ ] Include tests with pair-indices
       - [ ] Include tests with non-pair indices
     - [ ] Test on both CLJ and CLJS platforms
-  - [ ] MISC:
-    - [ ] Introduce cross-platform error function/macro in util
+  - [ ] Misc
+    - [ ] Function that outputs to CSV (tab-separated or filter out commas)
+
+
+
+* Test Matrix
+  A matrix to cover all the testing configurations
+  2 x 2 x 3 x 2 = 24
+  |  / | :any-row   | :any-col   | :keys-only | :by-rows |   |   |   |
+  |  / | :every-row | :every-col | :vals-only | :by-cols |   |   |   |
+  |  / |            |            | default    |          |   |   |   |
+  |----+------------+------------+------------+----------+---+---+---|
+
+  
 
 
 * Test-Map as Row/Column Table

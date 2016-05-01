@@ -199,6 +199,7 @@
      (col [this c-key] (colIdx c-key))
      (rows [this] rowIdx)
      (cols [this] colIdx)
+     ;; TODO: Move this method into its own helper function
      (crossIndexRows [this r-keys
                       {:keys [any every
                               any-row every-row
