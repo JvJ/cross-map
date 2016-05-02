@@ -21,34 +21,35 @@ respectively.
 
 As an example, take the following map:
 
-(def c-map (cross-map [:a 1] :A1, [:a 2] :A2, [:b 1] :B1, [:a 3] :A3, [:c 1] :C1))
-=> {[:a 1] :A1, [:a 2] :A2, [:b 1] :B1, [:a 3] :A3, [:c 1] :C1}
+    (def c-map (cross-map [:a 1] :A1, [:a 2] :A2, [:b 1] :B1, [:a 3] :A3, [:c 1] :C1))
+    => {[:a 1] :A1, [:a 2] :A2, [:b 1] :B1, [:a 3] :A3, [:c 1] :C1}
 
 As you can see, it looks like any other persistent map.  However,
 a this cross-map will have the following row index and column index:
 
-(.rowIdx c-map) => {:a {1 :A1, 2 :A2, 3 :A3}, :b {1 :B1}, :c {1 :C1}}
-(.colIdx c-map) => {1 {:a :A1, :b :B1, :c :C1}, 2 {:a :A2}, 3 {:a :A3}}
+    (.rowIdx c-map) => {:a {1 :A1, 2 :A2, 3 :A3}, :b {1 :B1}, :c {1 :C1}}
+    (.colIdx c-map) => {1 {:a :A1, :b :B1, :c :C1}, 2 {:a :A2}, 3 {:a :A3}}
 
 Removing, adding, and/or updating elements in the main map will be
 mirrored in both the row-index and the col-index.
 
 For instance, let's associate a new entry:
-(def c-map2 (assoc c-map [:c 3] :C3))
-=> {[:a 1] :A1, [:a 2] :A2, [:b 1] :B1, [:a 3] :A3, [:c 1] :C1, [:c 3] :C3}
+
+    (def c-map2 (assoc c-map [:c 3] :C3))
+    => {[:a 1] :A1, [:a 2] :A2, [:b 1] :B1, [:a 3] :A3, [:c 1] :C1, [:c 3] :C3}
 
 We get what we would expect from any associative map.  But the row and
 column indies are also updated:
 
-(.rowIdx c-map2) => {:a {1 :A1, 2 :A2, 3 :A3}, :b {1 :B1}, :c {1 :C1, 3 :C3}}
-(.colIdx c-map2) => {1 {:a :A1, :b :B1, :c :C1}, 2 {:a :A2}, 3 {:a :A3, :c :C3}}
+    (.rowIdx c-map2) => {:a {1 :A1, 2 :A2, 3 :A3}, :b {1 :B1}, :c {1 :C1, 3 :C3}}
+    (.colIdx c-map2) => {1 {:a :A1, :b :B1, :c :C1}, 2 {:a :A2}, 3 {:a :A3, :c :C3}}
 
 Internally, this is achieved by maintaining three maps - the main map, the row
 index and the column index.  They are updated something like this:
 
-(assoc mainMap [:c 3] :C3)
-(assoc-in rowIdx [:c 3] :C3)
-(assoc-in colIdx [3 :c] :C3)
+    (assoc mainMap [:c 3] :C3)
+    (assoc-in rowIdx [:c 3] :C3)
+    (assoc-in colIdx [3 :c] :C3)
 
 ## The Cross operations
 
