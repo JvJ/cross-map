@@ -58,40 +58,40 @@ and building up an intermediate structure.
 
 Three operations are supported:
 * cross
-..* args: [row-keys col-keys & opts]
-..* Returns a lazy sequence of [[r c] val] entries that match specifications.
+  * args: [row-keys col-keys & opts]
+  * Returns a lazy sequence of [[r c] val] entries that match specifications.
 * cross-rows
-..* args: [row-keys & opts]
-..* Returns a lazy sequence of [c column-map] entries, where column-map represents
+  * args: [row-keys & opts]
+  * Returns a lazy sequence of [c column-map] entries, where column-map represents
     the entire column c, and these entries match specifications.
 * cross-cols
-..* args: [col-keys & opts]
-..* Returns a lazy sequence of [r row-map] entries, where column-map represents
+  * args: [col-keys & opts]
+  * Returns a lazy sequence of [r row-map] entries, where column-map represents
     the entire column r, and these entries match specifications.
 
 Options are as follows:
 * :any-row
-..* Columns returned will have an entry in at least one of the specified rows.
+  * Columns returned will have an entry in at least one of the specified rows.
     (Not valid in cross-cols)
 * :every-row
-..* Columns returned will have entires in all of the specified rows.
+  * Columns returned will have entires in all of the specified rows.
     (Not valid in cross-cols)
 * :any-col
-..* Rows returned will have an entry in at least one of the specified columns.
+ * Rows returned will have an entry in at least one of the specified columns.
     (Not valid in cross-rows)
 * :every-col
-..* Rows returned will have entries in all of the specified columns.
+  * Rows returned will have entries in all of the specified columns.
     (Not valid in cross-rows)
 * :keys-only
-..* Return only the keys that match.  Keys are [r c] for cross, c for cross-rows
+  * Return only the keys that match.  Keys are [r c] for cross, c for cross-rows
     and r for cross-cols.
 * :vals-only
-..* Return only the values that match.  Values are individual entries for cross,
+ * Return only the values that match.  Values are individual entries for cross,
     entire columns for cross-rows, and entire rows for cross-cols.
 * :by-rows
-..* The sequence is ordered row-first.  (Only valid in cross) 
+ * The sequence is ordered row-first.  (Only valid in cross) 
 * :by-cols
-..* The sequence is ordered column-first. (Only valid in cross)
+ * The sequence is ordered column-first. (Only valid in cross)
 
 Default options, if no options are specified:
 * :every-row and :every-col over :any-row and :any-col
