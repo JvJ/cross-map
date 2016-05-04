@@ -2,7 +2,11 @@
   "Defines operations on the cross-map data structure."
 
   (:require [cross-map.util :as u
-             :refer [pair? dissoc-in vmemo]])
+             :refer [pair? dissoc-in #?(:clj Err)]])
+  
+  #?(:cljs
+     (:require-macros [cross-map.util :as u
+                       :refer [Err]]))
   
   ;; Clojure-specific imports of java interfaces
   ;; to implement
@@ -12,7 +16,7 @@
                             IObj
                             MapEquivalence
                             IFn
-                            SeqIterator
+n                            SeqIterator
                             MapEntry
                             IEditableCollection
                             ITransientMap
@@ -35,7 +39,7 @@
   (crossIndexCols [this c-keys opts] "Full-map cross-section by col-first.")
   (crossIndex [this r-keys c-keys opts] "Cross section of elements in all specified rows and all specified columns."))
 
-(defn- cross-index-helper
+(defn- cross-rows-cols-helper
   "crossIndexRows and crossIndexColumns are the same if you switch
   around instances of rowIdx and colIdx.  Pass in true to rows? to
   iterate over rows.  False to iterate over columns.
@@ -45,16 +49,16 @@
   [this rows? selected-keys
    {:keys [every any keys-only vals-only] :as opts}]
   (let [_ (and any every
-               (throw (Exception.
+               (throw (Err
                        (if rows?
                          ":any-row and :every-row cannot both be specified."
                          ":any-col and :every-col cannot both be specified."))))
         opts (disj opts :any :every)
         _ (and keys-only vals-only   
-               (throw (Exception. (str "Invalid key/value options: " opts))))
+               (throw (Err (str "Invalid key/value options: " opts))))
         opts (disj opts :keys-only :vals-only)
         _ (if-not (empty? opts)
-            (throw (Exception. (str "Unsupported options: " opts))))
+            (throw (Err (str "Unsupported options: " opts))))
 
         rowIdx (.rowIdx this)
         colIdx (.colIdx this)
@@ -100,6 +104,78 @@
         :keys-only sk
         :vals-only (sec sk)
         [sk (sec sk)]))))
+
+(defn- cross-index-helper
+  "Helper functoin for full cross indexing."
+  [this r-keys c-keys
+   {:keys [any-row every-row
+           any-col every-col
+           keys-only vals-only
+           by-rows by-cols] :as opts}]
+  (let [_ (and every-row any-row
+               (throw (Err "Cannot specify both :any-row and :every-row.")))
+        opts (disj opts :any-row :every-row)
+        _ (and every-col any-col
+               (throw (Err "Cannot specify both :any-col and :every-col.")))
+        opts (disj opts :any-col :every-col)
+        _ (and keys-only vals-only
+               (throw (Err "Cannot specify both :keys-only and :vals-only.")))
+        opts (disj opts :keys-only :vals-only)
+        _ (and by-rows by-cols
+               (throw (Err "Cannot specify both :by-rows and :by-cols.")))
+        opts (disj opts :by-rows :by-cols)
+        _ (if-not (empty? opts)
+            (throw (Err (str "Unsupported options: " opts))))
+        
+        ;; Doing a quick little memoization with volatiles
+        ;; instead of atoms. #ThugLife #BreakingTheLaw
+        checkfn (fn [f coll]
+                  (let [v (volatile! (transient {}))]
+                    (fn [k]
+                      (or (@v k)
+                          (let [ret (f k coll)]
+                            (vswap! v assoc! k ret)
+                            ret)))))
+        
+        by-rows (or by-rows (not by-cols))
+
+        
+        [pri every-pri any-pri pri-keys
+         sec every-sec any-sec sec-keys]
+        (if by-rows
+          [(. this rowIdx) every-row any-row r-keys
+           (. this colIdx) every-col any-col c-keys]
+          [(. this colIdx) every-col any-col c-keys
+           (. this rowIdx) every-row any-row r-keys])
+
+        ;; (every? ()) is always true,
+        ;; so we can treat it as (some <all-keys>)
+        [every-pri pri-keys] (if (and (empty? pri-keys)
+                                      (or every-pri (not any-pri)))
+                               [false (keys pri)]
+                               [every-pri pri-keys])
+        [every-sec sec-keys] (if (and (empty? sec-keys)
+                                      (or every-sec (not any-sec)))
+                               [false (keys sec)]
+                               [every-sec sec-keys])
+
+        ;; A valid column must check all/any rows
+        valid-pri? (checkfn (if every-sec
+                              #(and (pri %1) (every? (pri %1) %2))
+                              #(and (pri %1) (some (pri %1) %2)))
+                            sec-keys)
+
+        ;; A valid row must check all/any columns
+        valid-sec? (checkfn (if every-pri
+                              #(and (sec %1) (every? (sec %1) %2))
+                              #(and (sec %1) (some (sec %1) %2)))
+                            pri-keys)]
+    (for [pk pri-keys
+          :when (valid-pri? pk)
+          sk sec-keys
+          :let [entry (find (. this mainMap) [pk sk])]
+          :when (and entry (valid-sec? sk))]
+      entry)))
 
 ;;;; CLJ Implementation
 #?(:clj
@@ -204,7 +280,7 @@
                       {:keys [any every
                               any-row every-row
                               keys-only vals-only] :as opts}]
-       (cross-index-helper this true r-keys
+       (cross-rows-cols-helper this true r-keys
                            (-> opts
                                (disj :any-row :every-row)
                                (conj (and any-row :any)
@@ -214,7 +290,7 @@
                          {:keys [any every
                                  any-col every-col
                                  keys-only vals-only] :as opts}]
-       (cross-index-helper this false c-keys
+       (cross-rows-cols-helper this false c-keys
                            (-> opts
                                (disj :any-col :every-col)
                                (conj (and any-col :any)
@@ -227,19 +303,19 @@
                           keys-only vals-only
                           by-rows by-cols] :as opts}]
        (let [_ (and every-row any-row
-                    (throw (Exception. "Cannot specify both :any-row and :every-row.")))
+                    (throw (Err "Cannot specify both :any-row and :every-row.")))
              opts (disj opts :any-row :every-row)
              _ (and every-col any-col
-                    (throw (Exception. "Cannot specify both :any-col and :every-col.")))
+                    (throw (Err "Cannot specify both :any-col and :every-col.")))
              opts (disj opts :any-col :every-col)
              _ (and keys-only vals-only
-                    (throw (Exception. "Cannot specify both :keys-only and :vals-only.")))
+                    (throw (Err "Cannot specify both :keys-only and :vals-only.")))
              opts (disj opts :keys-only :vals-only)
              _ (and by-rows by-cols
-                    (throw (Exception. "Cannot specify both :by-rows and :by-cols.")))
+                    (throw (Err "Cannot specify both :by-rows and :by-cols.")))
              opts (disj opts :by-rows :by-cols)
              _ (if-not (empty? opts)
-                 (throw (Exception. (str "Unsupported options: " opts))))
+                 (throw (Err (str "Unsupported options: " opts))))
              
              ;; Doing a quick little memoization with volatiles
              ;; instead of atoms. #ThugLife #BreakingTheLaw
@@ -330,18 +406,18 @@
         colIdx]
 
      Object ; Basic JS object functionality
-     (toString [this] (.toString mainMap))
+     (-toString [this] (.toString mainMap))
 
      ;;; The subsequent Object methods are based on methods
      ;;; marked as experimental in cljs.core/PersistentHashMap.
      ;;; Unsure of the reliability/stability of these
-     (equiv [this other] (-equiv this other))
-     (keys [this] (es6-iterator (keys mainMap)))
-     (entries [this] (es6-entries-iterator (seq mainMap)))
-     (values [this (es6-iterator (vals mainMap))])
-     (has [this k] (contains? mainMap k))
-     (get [this k not-found] (get mainMap k not-found))
-     (forEach [this f] (doseq [[k v] mainMap] (f v k)))
+     (-equiv [this other] (-equiv this other))
+     (-keys [this] (es6-iterator (keys mainMap)))
+     (-entries [this] (es6-entries-iterator (seq mainMap)))
+     (-values [this (es6-iterator (vals mainMap))])
+     (-has [this k] (contains? mainMap k))
+     (-get [this k not-found] (get mainMap k not-found))
+     (-forEach [this f] (doseq [[k v] mainMap] (f v k)))
 
      ICloneable
      (-clone [this] (PersistentCrossMap. mainMap rowIdx colIdx))

@@ -4,7 +4,13 @@
             [cross-map.util :refer :all]
             [criterium.core :as cri :refer [bench]]))
 
+(def ^:dynamic *random* false)
 (def ^:dynamic *benchmarking* false)
+
+(defmacro with-random
+  [& body]
+  `(binding [*random* true]
+     ~@body)) 
 
 (defmacro with-benchmarking
   [& body]
@@ -14,206 +20,238 @@
 ;;;; A test-map that we can use for cross-referencing!
 (def alphabet (map char (range (int \a) (inc (int \z)))))
 
-(defn gen-grid-pairs
-  "Generate a sequence of grid entries of num-rows by num-cols,
-  and randomly select num-keep of then.
+(def test-rows (range 10))
+(def test-cols (map (comp keyword str) (take 10 alphabet)))
+(def num-removed 5)
 
-  Keep in mind that num-cols won't go to more than 26, since
-  the columns are labelled by the letters of the alphabet."
-  [row-seq col-seq num-rows num-cols fraction-keep]
-  (->> (for [row (take num-rows row-seq)
-             col (take num-cols col-seq)]
-         [[row col] (keyword (str row "_" col))])
-       (shuffle)
-       (take (int (* (- 1 fraction-keep)
-                     (* num-rows num-cols))))))
+(defn make-test-entry
+  [i l]
+  (keyword (str (name l) "_" i)))
 
-(defn proxy-cross
-  "An inefficient filtering operation that will produce
-  the same output as other cross operations.
-  Key mode can either be :keys, :vals, :entries, :row-maps,
-  or :col-maps."
-  [cmap row-keys col-keys every-row? every-col?
-   key-mode]
-  (let [map-mode (case key-mode
-                   :row-maps :row
-                   :col-maps :col
-                   nil)
+(let [test-pairs (for [i test-rows
+                       l test-cols]
+                   [[i l] (make-test-entry i l)])]
 
-        key-mode (if map-mode
-                   :keys
-                   key-mode)
+  (def test-cmap (into (cross-map) test-pairs))
+  (def test-map (into {} test-pairs)))
 
-        row-check (if every-col? every? some)
-        col-check (if every-row? every? some)
-        
-        iter-rows (cond
-                    (and every-row?
-                         (empty? row-keys)) (->> cmap
-                                                 keys
-                                                 (filter pair?)
-                                                 (map first)
-                                                 set)
-                    :else row-keys)
-        
-        iter-cols (cond
-                    (and every-col?
-                         (empty? col-keys)) (->> cmap
-                                                 keys
-                                                 (filter pair?)
-                                                 (map second)
-                                                 set)
-                    :else col-keys)
+(deftest
+  ^{:doc "Testing cross operations according to constant values.
+See tasks.org for the source tables."}
+  const-cross-test
+  ;; LEFTOFF: Replace nil with expected value of operations
+  (let [removals (list [2,:c],[2,:e],[4,:f],[6,:b],[7,:c],[7,:f])
+        test-cmap (apply disj test-cmap removals)
+        row-keys [3,4,5,6]
+        col-keys [:c,:d,:e]]
+    (do
+      ;; Default/every row
+      (is (= (set (cross-rows test-cmap row-keys))
+             (set (cross-rows test-cmap row-keys :every-row))
+             nil))
+      ;; Any-row
+      (is (= (set (cross-rows test-cmap row-keys :any-row))
+             nil))
 
-        ret (for [r iter-rows
-                  ;; LEFTOFF: Double-crossing ain't working right!!
-                  :when (row-check #(contains? cmap [r %]) col-keys)
-                  c iter-cols
-                  :when (and (col-check #(contains? cmap [% c]) row-keys)
-                             (cmap [r c]))]
-              (case key-mode
-                    :keys [r c]
-                    :vals (cmap [r c])
-                    :entries (find cmap [r c])))]
-    (case map-mode
-      :row (->> ret
-                (group-by first)
-                (map (fn [[r pairs]]
-                       [r (reduce (fn [acc [r c]]
-                                    (assoc acc c (cmap [r c])))
-                                  {}
-                                  pairs)])))
-      :col (->> ret
-                (group-by second)
-                (map (fn [[c pairs]]
-                       [c (reduce (fn [acc [r c]]
-                                    (assoc acc r (cmap [r c])))
-                                  {}
-                                  pairs)])))
-      ret)))
+      ;; Keys-only
+      ;; Default/every row
+      (is (= (set (cross-rows test-cmap row-keys :keys-only))
+             (set (cross-rows test-cmap row-keys :every-row :keys-only))
+             nil))
+      ;; Keys-only
+      ;; Any-row
+      (is (= (set (cross-rows test-cmap row-keys :any-row :keys-only))
+             nil))
 
-(deftest cross-test
-  ;; We're doing a *big* test here.  Assuming
-  ;; 10,000 rows with 100 cols.(TODO: This is more for benchmarking)
+      ;; Vals-only
+      ;; Default/every-row
+      (is (= (set (cross-rows test-cmap row-keys :vals-only))
+             (set (cross-rows test-cmap row-keys :every-row :vals-only))
+             nil))
+      ;; Vals-only
+      ;; Any-row
+      (is (= (set (cross-rows test-cmap row-keys :any-row :vals-only))
+             nil)))
+    ;; Cross-cols
+    (do
+      ;; Default/every col
+      (is (= (set (cross-cols test-cmap col-keys))
+             (set (cross-cols test-cmap col-keys :every-col))
+             nil))
+      ;; Any-col
+      (is (= (set (cross-cols test-cmap col-keys :any-col))
+             nil))
+
+      ;; Keys-only
+      ;; Default/every row
+      (is (= (set (cross-cols test-cmap col-keys :keys-only))
+             (set (cross-cols test-cmap col-keys :every-col :keys-only))))
+      ;; Keys-only
+      ;; Any-col
+      (is (= (set (cross-cols test-cmap col-keys :any-col :keys-only))))
+
+      ;; Vals-only
+      ;; Default/every-col
+      (is (= (set (cross-cols test-cmap col-keys :vals-only))
+             (set (cross-cols test-cmap col-keys :every-col :vals-only))
+             nil))
+      ;; Vals-only
+      ;; Any-col
+      (is (= (set (cross-cols test-cmap col-keys :any-col :vals-only))
+             nil)))
+    ;; Full Cross
+    (do
+      ;; Default/every-row & every-col
+      (is (= (set (cross test-cmap row-keys col-keys))
+             (set (cross test-cmap row-keys col-keys :every-row :every-col))
+             nil)))))
+
+(deftest
+  ^{:doc "Test the cross map according to a cross-map with random dissociations."}
+  rand-cross-test
+  (let [;; Randomly dissociate a few entries
+        removals (take num-removed (shuffle (keys test-cmap)))
+        test-cmap (apply dissoc test-cmap removals)
+        row-keys (take 2 (shuffle test-rows))
+        col-keys (take 2 (shuffle test-cols))]
+
+    (with-test-out
+      (println "test-cmap: " test-cmap))
+    
+    ;; Cross-rows
+    (do
+      ;; Default/every row
+      (is (= (set (cross-rows test-cmap row-keys))
+             (set (cross-rows test-cmap row-keys :every-row))
+             (set (->> test-cmap
+                       cols
+                       (filter #(every? (second %) row-keys))))))
+      ;; Any-row
+      (is (= (set (cross-rows test-cmap row-keys :any-row))
+             (set (->> test-cmap
+                       cols
+                       (filter #(some (second %) row-keys))))))
+
+      ;; Keys-only
+      ;; Default/every row
+      (is (= (set (cross-rows test-cmap row-keys :keys-only))
+             (set (cross-rows test-cmap row-keys :every-row :keys-only))
+             (set (->> test-cmap
+                       cols
+                       (filter #(every? (second %) row-keys))
+                       (map key)))))
+      ;; Keys-only
+      ;; Any-row
+      (is (= (set (cross-rows test-cmap row-keys :any-row :keys-only))
+             (set (->> test-cmap
+                       cols 
+                       (filter #(some (second %) row-keys))
+                       (map key)))))
+
+      ;; Vals-only
+      ;; Default/every-row
+      (is (= (set (cross-rows test-cmap row-keys :vals-only))
+             (set (cross-rows test-cmap row-keys :every-row :vals-only))
+             (set (->> test-cmap
+                       cols
+                       (filter #(every? (second %) row-keys))
+                       (map val)))))
+      ;; Vals-only
+      ;; Any-row
+      (is (= (set (cross-rows test-cmap row-keys :any-row :vals-only))
+             (set (->> test-cmap
+                       cols 
+                       (filter #(some (second %) row-keys))
+                       (map val))))))
+    ;; Cross-cols
+    (do
+      ;; Default/every col
+      (is (= (set (cross-cols test-cmap col-keys))
+             (set (cross-cols test-cmap col-keys :every-col))
+             (set (->> test-cmap
+                       rows
+                       (filter #(every? (second %) col-keys))))))
+      ;; Any-col
+      (is (= (set (cross-cols test-cmap col-keys :any-col))
+             (set (->> test-cmap
+                       rows
+                       (filter #(some (second %) col-keys))))))
+
+      ;; Keys-only
+      ;; Default/every row
+      (is (= (set (cross-cols test-cmap col-keys :keys-only))
+             (set (cross-cols test-cmap col-keys :every-col :keys-only))
+             (set (->> test-cmap
+                       rows
+                       (filter #(every? (second %) col-keys))
+                       (map key)))))
+      ;; Keys-only
+      ;; Any-col
+      (is (= (set (cross-cols test-cmap col-keys :any-col :keys-only))
+             (set (->> test-cmap
+                       rows 
+                       (filter #(some (second %) col-keys))
+                       (map key)))))
+
+      ;; Vals-only
+      ;; Default/every-col
+      (is (= (set (cross-cols test-cmap col-keys :vals-only))
+             (set (cross-cols test-cmap col-keys :every-col :vals-only))
+             (set (->> test-cmap
+                       rows
+                       (filter #(every? (second %) col-keys))
+                       (map val)))))
+      ;; Vals-only
+      ;; Any-col
+      (is (= (set (cross-cols test-cmap col-keys :any-col :vals-only))
+             (set (->> test-cmap
+                       rows 
+                       (filter #(some (second %) col-keys))
+                       (map val)))))
+      (report {:type String :value "HEY GUYS!"}))
+    ;; Full Cross
+    (do
+      ;; Default/every-row & every-col
+      (is (= (set (cross test-cmap row-keys col-keys))
+             (set (cross test-cmap row-keys col-keys :every-row :every-col))
+             (set (let [x
+                        (->> test-cmap
+                             (group-by (comp first key) ,,,)
+                             (eduction (comp (map (fn [[k v]]
+                                                    (kvp k (transduce
+                                                            (comp (map (fn [[[r c] vv]] (kvp c vv)))
+                                                                  (filter #(some ($ = (key %)) col-keys)))
+                                                            conj {} v))))
+                                             (filter #(every? (val %) col-keys))
+                                             (mapcat (fn [[r v]] (map (fn [[c vv]] (kvp [r c] vv)) v)))) ,,,)
+                             ;; TODO: Just use thread instead of eduction
+                             ;; It will be slower, but that's kind of the point of
+                             ;; this test code.
+                             (group-by (comp second key) ,,,)
+                             (eduction (comp (map (fn [[k v]]
+                                                    (kvp k (transduce
+                                                            (comp (map (fn [[[r c] vv]] (kvp r vv)))
+                                                                  (filter #(some ($ = (key %)) row-keys)))
+                                                            conj {} v))))
+                                             (filter #(every? (val %) row-keys)) 
+                                             (mapcat (fn [[c v]] (map (fn [[r vv]] (kvp [r c] vv)) v)))) ,,,))
+                        _ (println "row-keys: " row-keys)
+                        _ (println "col-keys: " col-keys)
+                        _ (println "res: " (set x))]
+                    x))))))
+
+  ;; Cross-cols
+  )
+
+;;; Confirm that cross-maps support all map operations
+(deftest map-test)
+
+;;; Confirm that additions/removals are properly reflected
+;;; In the row/col indices, and that "rows" and "cols" match
+;;; metadata counterparts
+(deftest indexing-test)
+
+(defn test-ns-hook
+  []
   
-  ;; We'll construct it such that the first 10 cols
-  ;; have a high chance of being present, and
-  ;; the remaining 90 have a low chance of that.
-  ;; This will best simulate the ECS use case that
-  ;; cross-maps were designed for.
-  (let [syms (repeatedly gensym)
-        init-syms (take 2 syms)
-        rest-syms (take 8 (drop 2 syms))
-        idxs (range 15)
-        ;; First 10 columns have a 90% chance of being present
-        init-pairs (gen-grid-pairs idxs init-syms 15 2 9/10)
-        ;; Next 90 columns have a 10% chance of being present
-        rest-pairs (gen-grid-pairs idxs rest-syms 15 10 1/10)
-
-        all-pairs (concat init-pairs rest-pairs)
-
-        ;; The cross map will be tested against a normal map
-        test-cmap (into (cross-map) all-pairs)
-        test-map (into {} all-pairs)
-
-        opts (for [any-row   [nil :any-row]
-                   every-row [nil :every-row]
-                   any-col   [nil :any-col]
-                   every-col [nil :every-col]
-                   keys-only [nil :keys-only]
-                   vals-only [nil :vals-only]
-                   by-rows   [nil :by-rows]
-                   by-cols   [nil :by-cols]
-                   r-keys?   [false true]
-                   c-keys?   [false true]]
-               [any-row every-row any-col every-col
-                keys-only vals-only by-rows by-cols
-                r-keys? c-keys?])
-        
-        ;; Iterate through all combinations of options
-        ;; LEFTOFF: Maybe this isn't the best testing strategy?
-        tests (for [[any-row   
-                     every-row 
-                     any-col   
-                     every-col 
-                     keys-only 
-                     vals-only 
-                     by-rows   
-                     by-cols   
-                     r-keys?   
-                     c-keys?] opts  
-                    :let [;; Random keys
-                          r-keys (if r-keys?
-                                   (take 3 (shuffle idxs))
-                                   ())
-                          c-keys (if c-keys?
-                                   (concat (take 3 (shuffle init-syms))
-                                           (take 3 (shuffle rest-syms)))
-                                   ())
-
-                          every-row? (boolean every-row)
-                          every-col? (boolean every-col)
-                          key-mode (or (and keys-only :keys)
-                                       (and vals-only :vals))
-                          args (set
-                                (filter boolean
-                                        [any-row every-row any-col every-col
-                                         keys-only vals-only by-rows by-cols]))
-
-
-                          op   #(set (apply cross test-cmap r-keys c-keys %))
-                          r-op #(set (apply cross-rows test-cmap r-keys %))
-                          c-op #(set (apply cross-cols test-cmap c-keys %))
-                          proxy-op   #(set (proxy-cross test-map r-keys c-keys
-                                                  every-row? every-col?
-                                                  (or key-mode :entries)))
-                          proxy-r-op #(set (proxy-cross test-map r-keys ()
-                                                  every-row? true
-                                                  (or key-mode :col-maps)))
-                          proxy-c-op #(set (proxy-cross test-map () c-keys
-                                                  true every-col?
-                                                  (or key-mode :row-maps)))]]
-                (cond
-                  ;; These options cannot co-exist
-                  (or (and any-row every-row)
-                      (and any-col every-col)
-                      (and keys-only vals-only)
-                      (and by-rows by-cols))
-                  (do (is (thrown? Exception (op args)))
-                      ;; Row and col options can't go together
-                      (and (or any-row every-row)
-                           (or any-col every-col)
-                           (is (thrown? Exception (r-op args)))
-                           (is (thrown? Exception (c-op args)))))
-
-                  :else 
-                  (do (is (= (proxy-op) (op args)))
-                      (is (= (proxy-r-op) (r-op args)))
-                      (is (= (proxy-c-op) (c-op args))))))]
-    (doseq [t (take 10 tests)]
-      nil)
-    (println (take 10 opts))))
-
-(defn volatile-test
-  "Just checking that running pmap on lazy
-  sequences that use volatile variables."
-  [num-syms bench?]
-  (letfn [(idx-zip [coll]
-            (let [i (volatile! -1)]
-              (for [c coll]
-                [c (vswap! i inc)])))
-          
-          (dummy-func [[sym n]]
-            (let [[_ s] (re-find #"G__(\d)+" (name sym))
-                  m (read-string s)]
-              (reduce + (range (* n m)))))]
-    (let [syms (repeatedly num-syms gensym)
-          sym-idx (idx-zip syms)
-          p-sums (pmap dummy-func sym-idx)
-          sums (map dummy-func sym-idx)
-          ]
-      (when bench?
-        (bench (reduce conj [] p-sums))
-        (bench (reduce conj [] sums)))
-      (is (= p-sums
-             sums)))))
+  (rand-cross-test))

@@ -1,6 +1,21 @@
 (ns cross-map.util
   "Utility functions for cross-map implementation.")
 
+(defmacro $
+  "Alias for core/partial."
+  [& body]
+  `(partial ~@body))
+
+(defmacro <|
+  "Composition."
+  [& body]
+  `(comp ~@body))
+
+(defmacro Err
+  "Create an exception in clj or cljs."
+  [& body]
+  #?(:clj  `(Exception. ~@body)
+     :cljc `(js/Error. ~@body)))
 
 (defn pair?
   "Utility function that determines whether a value is
@@ -8,6 +23,12 @@
   [v]
   (and (vector? v)
        (= (count v) 2)))
+
+(defn kvp
+  "Utility for cross-platform key-value-pair creation."
+  [k v]
+  #?(:clj  (clojure.lang.MapEntry. k v)
+     :cljs [k v]))
 
 ;;; Memoization using volatiles.  Avoids the overhead for single-threaded uses.
 (defn vmemo [f]
