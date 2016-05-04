@@ -2,12 +2,13 @@
   "Utility functions for cross-map implementation.")
 
 (defmacro $
-  "Alias for core/partial."
+  "Alias for core/partial. Seven letters makes partial
+  application take up too much text."
   [& body]
   `(partial ~@body))
 
 (defmacro <|
-  "Composition."
+  "Alias for core/comp."
   [& body]
   `(comp ~@body))
 
@@ -29,6 +30,16 @@
   [k v]
   #?(:clj  (clojure.lang.MapEntry. k v)
      :cljs [k v]))
+
+(defn ky [[k _ :as kv]]
+  "Improved version of core/key that works on vectors."
+  {:pre [(= (count kv) 2)]}
+  k)
+
+(defn vl [[_ v :as kv]]
+  "Improved version of core/val that works on vectors."
+  {:pre [(= (count kv) 2)]}
+  v)
 
 ;;; Memoization using volatiles.  Avoids the overhead for single-threaded uses.
 (defn vmemo [f]

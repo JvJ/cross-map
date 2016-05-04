@@ -39,39 +39,77 @@
   ^{:doc "Testing cross operations according to constant values.
 See tasks.org for the source tables."}
   const-cross-test
-  ;; LEFTOFF: Replace nil with expected value of operations
-  (let [removals (list [2,:c],[2,:e],[4,:f],[6,:b],[7,:c],[7,:f])
-        test-cmap (apply disj test-cmap removals)
+  (let [removals (list [2,:c],[2,:d],[2,:e],[4,:f],[6,:b],[7,:c],
+                       [7,:f],[3,:j],[4,:j],[5,:j],[6,:j])
+        test-cmap (apply dissoc test-cmap removals)
         row-keys [3,4,5,6]
         col-keys [:c,:d,:e]]
     (do
       ;; Default/every row
       (is (= (set (cross-rows test-cmap row-keys))
              (set (cross-rows test-cmap row-keys :every-row))
-             nil))
+             ;; We expect entire columns that match, even if some keys
+             ;; are not asked for
+             (set #{[:a {0 :a_0, 1 :a_1, 2 :a_2, 3 :a_3, 4 :a_4, 5 :a_5, 6 :a_6, 7 :a_7, 8 :a_8, 9 :a_9}],
+                    [:c {0 :c_0, 1 :c_1, 3 :c_3, 4 :c_4, 5 :c_5, 6 :c_6, 8 :c_8, 9 :c_9}],
+                    [:d {0 :d_0, 1 :d_1, 3 :d_3, 4 :d_4, 5 :d_5, 6 :d_6, 7 :d_7, 8 :d_8, 9 :d_9}],
+                    [:e {0 :e_0, 1 :e_1, 3 :e_3, 4 :e_4, 5 :e_5, 6 :e_6, 7 :e_7, 8 :e_8, 9 :e_9}],
+                    [:g {0 :g_0, 1 :g_1, 2 :g_2, 3 :g_3, 4 :g_4, 5 :g_5, 6 :g_6, 7 :g_7, 8 :g_8, 9 :g_9}],
+                    [:h {0 :h_0, 1 :h_1, 2 :h_2, 3 :h_3, 4 :h_4, 5 :h_5, 6 :h_6, 7 :h_7, 8 :h_8, 9 :h_9}]
+                    [:i {0 :i_0, 1 :i_1, 2 :i_2, 3 :i_3, 4 :i_4, 5 :i_5, 6 :i_6, 7 :i_7, 8 :i_8, 9 :i_9}]})))
       ;; Any-row
       (is (= (set (cross-rows test-cmap row-keys :any-row))
-             nil))
+             #{[:a {0 :a_0, 1 :a_1, 2 :a_2, 3 :a_3, 4 :a_4, 5 :a_5, 6 :a_6, 7 :a_7, 8 :a_8, 9 :a_9}],
+               [:b {0 :b_0, 1 :b_1, 2 :b_2, 3 :b_3, 4 :b_4, 5 :b_5, 7 :b_7, 8 :b_8, 9 :b_9}],
+               [:c {0 :c_0, 1 :c_1, 3 :c_3, 4 :c_4, 5 :c_5, 6 :c_6, 8 :c_8, 9 :c_9}],
+               [:d {0 :d_0, 1 :d_1, 3 :d_3, 4 :d_4, 5 :d_5, 6 :d_6, 7 :d_7, 8 :d_8, 9 :d_9}],
+               [:e {0 :e_0, 1 :e_1, 3 :e_3, 4 :e_4, 5 :e_5, 6 :e_6, 7 :e_7, 8 :e_8, 9 :e_9}],
+               [:f {0 :f_0, 1 :f_1, 2 :f_2, 3 :f_3, 5 :f_5, 6 :f_6, 8 :f_8, 9 :f_9}]
+               [:g {0 :g_0, 1 :g_1, 2 :g_2, 3 :g_3, 4 :g_4, 5 :g_5, 6 :g_6, 7 :g_7, 8 :g_8, 9 :g_9}],
+               [:h {0 :h_0, 1 :h_1, 2 :h_2, 3 :h_3, 4 :h_4, 5 :h_5, 6 :h_6, 7 :h_7, 8 :h_8, 9 :h_9}]
+               [:i {0 :i_0, 1 :i_1, 2 :i_2, 3 :i_3, 4 :i_4, 5 :i_5, 6 :i_6, 7 :i_7, 8 :i_8, 9 :i_9}]}))
 
       ;; Keys-only
       ;; Default/every row
       (is (= (set (cross-rows test-cmap row-keys :keys-only))
              (set (cross-rows test-cmap row-keys :every-row :keys-only))
-             nil))
+             #{:a, :c, :d, :e, :g, :h, :i}))
       ;; Keys-only
       ;; Any-row
       (is (= (set (cross-rows test-cmap row-keys :any-row :keys-only))
-             nil))
+             #{:a, :b, :c, :d, :e, :f, :g, :h, :i}))
 
       ;; Vals-only
       ;; Default/every-row
       (is (= (set (cross-rows test-cmap row-keys :vals-only))
              (set (cross-rows test-cmap row-keys :every-row :vals-only))
-             nil))
+             (set (list
+                   {0 :a_0, 1 :a_1, 2 :a_2, 3 :a_3, 4 :a_4, 5 :a_5, 6 :a_6, 7 :a_7, 8 :a_8, 9 :a_9},
+                   {0 :c_0, 1 :c_1, 3 :c_3, 4 :c_4, 5 :c_5, 6 :c_6, 8 :c_8, 9 :c_9},
+                   {0 :d_0, 1 :d_1, 3 :d_3, 4 :d_4, 5 :d_5, 6 :d_6, 7 :d_7, 8 :d_8, 9 :d_9},
+                   {0 :e_0, 1 :e_1, 3 :e_3, 4 :e_4, 5 :e_5, 6 :e_6, 7 :e_7, 8 :e_8, 9 :e_9},
+                   {0 :g_0, 1 :g_1, 2 :g_2, 3 :g_3, 4 :g_4, 5 :g_5, 6 :g_6, 7 :g_7, 8 :g_8, 9 :g_9},
+                   {0 :h_0, 1 :h_1, 2 :h_2, 3 :h_3, 4 :h_4, 5 :h_5, 6 :h_6, 7 :h_7, 8 :h_8, 9 :h_9}
+                   {0 :i_0, 1 :i_1, 2 :i_2, 3 :i_3, 4 :i_4, 5 :i_5, 6 :i_6, 7 :i_7, 8 :i_8, 9 :i_9}))))
+
+      ;; Verify row metadata
+      (is (= (set (map (<| :col meta) (cross-rows test-cmap row-keys :vals-only)))
+             (set (map (<| :col meta) (cross-rows test-cmap row-keys :every-row :vals-only)))
+             #{:a :c :d :e :g :h :i}))
+      
       ;; Vals-only
       ;; Any-row
+      ;; LEFTOFF: Complete const tests here!!
       (is (= (set (cross-rows test-cmap row-keys :any-row :vals-only))
-             nil)))
+             (set (list
+                   {0 :a_0, 1 :a_1, 2 :a_2, 3 :a_3, 4 :a_4, 5 :a_5, 6 :a_6, 7 :a_7, 8 :a_8, 9 :a_9},
+                   {0 :b_0, 1 :b_1, 2 :b_2, 3 :b_3, 4 :b_4, 5 :b_5, 7 :b_7, 8 :b_8, 9 :b_9},
+                   {0 :c_0, 1 :c_1, 3 :c_3, 4 :c_4, 5 :c_5, 6 :c_6, 8 :c_8, 9 :c_9},
+                   {0 :d_0, 1 :d_1, 3 :d_3, 4 :d_4, 5 :d_5, 6 :d_6, 7 :d_7, 8 :d_8, 9 :d_9},
+                   {0 :e_0, 1 :e_1, 3 :e_3, 4 :e_4, 5 :e_5, 6 :e_6, 7 :e_7, 8 :e_8, 9 :e_9},
+                   {0 :g_0, 1 :g_1, 2 :g_2, 3 :g_3, 4 :g_4, 5 :g_5, 6 :g_6, 7 :g_7, 8 :g_8, 9 :g_9},
+                   {0 :h_0, 1 :h_1, 2 :h_2, 3 :h_3, 4 :h_4, 5 :h_5, 6 :h_6, 7 :h_7, 8 :h_8, 9 :h_9}
+                   {0 :i_0, 1 :i_1, 2 :i_2, 3 :i_3, 4 :i_4, 5 :i_5, 6 :i_6, 7 :i_7, 8 :i_8, 9 :i_9})))))
     ;; Cross-cols
     (do
       ;; Default/every col
@@ -184,14 +222,14 @@ See tasks.org for the source tables."}
              (set (->> test-cmap
                        rows
                        (filter #(every? (second %) col-keys))
-                       (map key)))))
+                       (map ky)))))
       ;; Keys-only
       ;; Any-col
       (is (= (set (cross-cols test-cmap col-keys :any-col :keys-only))
              (set (->> test-cmap
                        rows 
                        (filter #(some (second %) col-keys))
-                       (map key)))))
+                       (map ky)))))
 
       ;; Vals-only
       ;; Default/every-col
@@ -200,7 +238,7 @@ See tasks.org for the source tables."}
              (set (->> test-cmap
                        rows
                        (filter #(every? (second %) col-keys))
-                       (map val)))))
+                       (map vl)))))
       ;; Vals-only
       ;; Any-col
       (is (= (set (cross-cols test-cmap col-keys :any-col :vals-only))
@@ -218,23 +256,23 @@ See tasks.org for the source tables."}
                         (->> test-cmap
                              (group-by (comp first key) ,,,)
                              (eduction (comp (map (fn [[k v]]
-                                                    (kvp k (transduce
-                                                            (comp (map (fn [[[r c] vv]] (kvp c vv)))
-                                                                  (filter #(some ($ = (key %)) col-keys)))
-                                                            conj {} v))))
-                                             (filter #(every? (val %) col-keys))
-                                             (mapcat (fn [[r v]] (map (fn [[c vv]] (kvp [r c] vv)) v)))) ,,,)
+                                                    [k (transduce
+                                                        (comp (map (fn [[[r c] vv]] [c vv]))
+                                                              (filter #(some ($ = (ky %)) col-keys)))
+                                                        conj {} v)]))
+                                             (filter #(every? (vl %) col-keys))
+                                             (mapcat (fn [[r v]] (map (fn [[c vv]] [[r c] vv]) v)))) ,,,)
                              ;; TODO: Just use thread instead of eduction
                              ;; It will be slower, but that's kind of the point of
                              ;; this test code.
                              (group-by (comp second key) ,,,)
                              (eduction (comp (map (fn [[k v]]
-                                                    (kvp k (transduce
-                                                            (comp (map (fn [[[r c] vv]] (kvp r vv)))
-                                                                  (filter #(some ($ = (key %)) row-keys)))
-                                                            conj {} v))))
-                                             (filter #(every? (val %) row-keys)) 
-                                             (mapcat (fn [[c v]] (map (fn [[r vv]] (kvp [r c] vv)) v)))) ,,,))
+                                                    [k (transduce
+                                                        (comp (map (fn [[[r c] vv]] [r vv]))
+                                                              (filter #(some ($ = (ky %)) row-keys)))
+                                                        conj {} v)]))
+                                             (filter #(every? (vl %) row-keys)) 
+                                             (mapcat (fn [[c v]] (map (fn [[r vv]] [[r c] vv]) v)))) ,,,))
                         _ (println "row-keys: " row-keys)
                         _ (println "col-keys: " col-keys)
                         _ (println "res: " (set x))]
@@ -253,5 +291,5 @@ See tasks.org for the source tables."}
 
 (defn test-ns-hook
   []
-  
+  (const-cross-test)
   (rand-cross-test))

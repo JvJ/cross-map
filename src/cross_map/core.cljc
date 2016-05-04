@@ -16,7 +16,7 @@
                             IObj
                             MapEquivalence
                             IFn
-n                            SeqIterator
+                            SeqIterator
                             MapEntry
                             IEditableCollection
                             ITransientMap
@@ -102,7 +102,8 @@ n                            SeqIterator
           :let [_ (and tags-v (vswap! tags-v conj! sk))]]
       (case kv-mode
         :keys-only sk
-        :vals-only (sec sk)
+        :vals-only (with-meta (sec sk)
+                     {(if rows? :col :row) sk})
         [sk (sec sk)]))))
 
 (defn- cross-index-helper
