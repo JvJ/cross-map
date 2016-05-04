@@ -99,50 +99,92 @@ See tasks.org for the source tables."}
       
       ;; Vals-only
       ;; Any-row
-      ;; LEFTOFF: Complete const tests here!!
       (is (= (set (cross-rows test-cmap row-keys :any-row :vals-only))
-             (set (list
-                   {0 :a_0, 1 :a_1, 2 :a_2, 3 :a_3, 4 :a_4, 5 :a_5, 6 :a_6, 7 :a_7, 8 :a_8, 9 :a_9},
-                   {0 :b_0, 1 :b_1, 2 :b_2, 3 :b_3, 4 :b_4, 5 :b_5, 7 :b_7, 8 :b_8, 9 :b_9},
-                   {0 :c_0, 1 :c_1, 3 :c_3, 4 :c_4, 5 :c_5, 6 :c_6, 8 :c_8, 9 :c_9},
-                   {0 :d_0, 1 :d_1, 3 :d_3, 4 :d_4, 5 :d_5, 6 :d_6, 7 :d_7, 8 :d_8, 9 :d_9},
-                   {0 :e_0, 1 :e_1, 3 :e_3, 4 :e_4, 5 :e_5, 6 :e_6, 7 :e_7, 8 :e_8, 9 :e_9},
-                   {0 :g_0, 1 :g_1, 2 :g_2, 3 :g_3, 4 :g_4, 5 :g_5, 6 :g_6, 7 :g_7, 8 :g_8, 9 :g_9},
-                   {0 :h_0, 1 :h_1, 2 :h_2, 3 :h_3, 4 :h_4, 5 :h_5, 6 :h_6, 7 :h_7, 8 :h_8, 9 :h_9}
-                   {0 :i_0, 1 :i_1, 2 :i_2, 3 :i_3, 4 :i_4, 5 :i_5, 6 :i_6, 7 :i_7, 8 :i_8, 9 :i_9})))))
+             #{{0 :a_0, 1 :a_1, 2 :a_2, 3 :a_3, 4 :a_4, 5 :a_5, 6 :a_6, 7 :a_7, 8 :a_8, 9 :a_9},
+               {0 :b_0, 1 :b_1, 2 :b_2, 3 :b_3, 4 :b_4, 5 :b_5, ,,,,,,, 7 :b_7, 8 :b_8, 9 :b_9},
+               {0 :c_0, 1 :c_1, ,,,,,,, 3 :c_3, 4 :c_4, 5 :c_5, 6 :c_6, ,,,,,,, 8 :c_8, 9 :c_9},
+               {0 :d_0, 1 :d_1, ,,,,,,, 3 :d_3, 4 :d_4, 5 :d_5, 6 :d_6, 7 :d_7, 8 :d_8, 9 :d_9},
+               {0 :e_0, 1 :e_1, ,,,,,,, 3 :e_3, 4 :e_4, 5 :e_5, 6 :e_6, 7 :e_7, 8 :e_8, 9 :e_9},
+               {0 :f_0, 1 :f_1, 2 :f_2, 3 :f_3, ,,,,,,, 5 :f_5, 6 :f_6, ,,,,,,, 8 :f_8, 9 :f_9},
+               {0 :g_0, 1 :g_1, 2 :g_2, 3 :g_3, 4 :g_4, 5 :g_5, 6 :g_6, 7 :g_7, 8 :g_8, 9 :g_9},
+               {0 :h_0, 1 :h_1, 2 :h_2, 3 :h_3, 4 :h_4, 5 :h_5, 6 :h_6, 7 :h_7, 8 :h_8, 9 :h_9},
+               {0 :i_0, 1 :i_1, 2 :i_2, 3 :i_3, 4 :i_4, 5 :i_5, 6 :i_6, 7 :i_7, 8 :i_8, 9 :i_9}})))
     ;; Cross-cols
     (do
       ;; Default/every col
       (is (= (set (cross-cols test-cmap col-keys))
              (set (cross-cols test-cmap col-keys :every-col))
-             nil))
+             #{[0 {:a :a_0, :b :b_0, :c :c_0, :d :d_0, :e :e_0, :f :f_0, :g :g_0, :h :h_0, :i :i_0, :j :j_0}]
+               [1 {:a :a_1, :b :b_1, :c :c_1, :d :d_1, :e :e_1, :f :f_1, :g :g_1, :h :h_1, :i :i_1, :j :j_1}]
+               ;; 2 -- not present
+               [3 {:a :a_3, :b :b_3, :c :c_3, :d :d_3, :e :e_3, :f :f_3, :g :g_3, :h :h_3, :i :i_3, ,,,,,,,}]
+               [4 {:a :a_4, :b :b_4, :c :c_4, :d :d_4, :e :e_4, ,,,,,,,, :g :g_4, :h :h_4, :i :i_4, ,, ,,,,}]
+               [5 {:a :a_5, :b :b_5, :c :c_5, :d :d_5, :e :e_5, :f :f_5, :g :g_5, :h :h_5, :i :i_5, ,,,,,,,}]
+               [6 {:a :a_6, ,,,,,,,, :c :c_6, :d :d_6, :e :e_6, :f :f_6, :g :g_6, :h :h_6, :i :i_6, ,,,,,,,}]
+               ;; 7 -- not present
+               [8 {:a :a_8, :b :b_8, :c :c_8, :d :d_8, :e :e_8, :f :f_8, :g :g_8, :h :h_8, :i :i_8, :j :j_8}]
+               [9 {:a :a_9, :b :b_9, :c :c_9, :d :d_9, :e :e_9, :f :f_9, :g :g_9, :h :h_9, :i :i_9, :j :j_9}]}))
+
       ;; Any-col
-      (is (= (set (cross-cols test-cmap col-keys :any-col))
-             nil))
+      (is 
+       (= (set (cross-cols test-cmap col-keys :any-col))
+          #{[0 {:a :a_0, :b :b_0, :c :c_0, :d :d_0, :e :e_0, :f :f_0, :g :g_0, :h :h_0, :i :i_0, :j :j_0}]
+               [1 {:a :a_1, :b :b_1, :c :c_1, :d :d_1, :e :e_1, :f :f_1, :g :g_1, :h :h_1, :i :i_1, :j :j_1}]
+               ;; 2 -- not present
+               [3 {:a :a_3, :b :b_3, :c :c_3, :d :d_3, :e :e_3, :f :f_3, :g :g_3, :h :h_3, :i :i_3, ,,,,,,,}]
+               [4 {:a :a_4, :b :b_4, :c :c_4, :d :d_4, :e :e_4, ,,,,,,,, :g :g_4, :h :h_4, :i :i_4, ,, ,,,,}]
+               [5 {:a :a_5, :b :b_5, :c :c_5, :d :d_5, :e :e_5, :f :f_5, :g :g_5, :h :h_5, :i :i_5, ,,,,,,,}]
+               [6 {:a :a_6, ,,,,,,,, :c :c_6, :d :d_6, :e :e_6, :f :f_6, :g :g_6, :h :h_6, :i :i_6, ,,,,,,,}]
+               [7 {:a :a_7, :b :b_7, ,,,,,,,, :d :d_7, :e :e_7, ,,,,,,,, :g :g_7, :h :h_7, :i :i_7, :j :j_7}]
+               [8 {:a :a_8, :b :b_8, :c :c_8, :d :d_8, :e :e_8, :f :f_8, :g :g_8, :h :h_8, :i :i_8, :j :j_8}]
+               [9 {:a :a_9, :b :b_9, :c :c_9, :d :d_9, :e :e_9, :f :f_9, :g :g_9, :h :h_9, :i :i_9, :j :j_9}]}))
 
       ;; Keys-only
       ;; Default/every row
       (is (= (set (cross-cols test-cmap col-keys :keys-only))
-             (set (cross-cols test-cmap col-keys :every-col :keys-only))))
+             (set (cross-cols test-cmap col-keys :every-col :keys-only))
+             #{0 1 3 4 5 6 8 9}))
       ;; Keys-only
       ;; Any-col
-      (is (= (set (cross-cols test-cmap col-keys :any-col :keys-only))))
+      (is (= (set (cross-cols test-cmap col-keys :any-col :keys-only)))
+          #{0 1 3 4 5 6 7 8 9})
 
       ;; Vals-only
       ;; Default/every-col
       (is (= (set (cross-cols test-cmap col-keys :vals-only))
              (set (cross-cols test-cmap col-keys :every-col :vals-only))
-             nil))
+             #{{:a :a_0, :b :b_0, :c :c_0, :d :d_0, :e :e_0, :f :f_0, :g :g_0, :h :h_0, :i :i_0, :j :j_0}
+               {:a :a_1, :b :b_1, :c :c_1, :d :d_1, :e :e_1, :f :f_1, :g :g_1, :h :h_1, :i :i_1, :j :j_1}
+               ;; 2 -- not present
+               {:a :a_3, :b :b_3, :c :c_3, :d :d_3, :e :e_3, :f :f_3, :g :g_3, :h :h_3, :i :i_3, ,,,,,,,}
+               {:a :a_4, :b :b_4, :c :c_4, :d :d_4, :e :e_4, ,,,,,,,, :g :g_4, :h :h_4, :i :i_4, ,, ,,,,}
+               {:a :a_5, :b :b_5, :c :c_5, :d :d_5, :e :e_5, :f :f_5, :g :g_5, :h :h_5, :i :i_5, ,,,,,,,}
+               {:a :a_6, ,,,,,,,, :c :c_6, :d :d_6, :e :e_6, :f :f_6, :g :g_6, :h :h_6, :i :i_6, ,,,,,,,}
+               ;; 7 -- not present
+               {:a :a_8, :b :b_8, :c :c_8, :d :d_8, :e :e_8, :f :f_8, :g :g_8, :h :h_8, :i :i_8, :j :j_8}
+               {:a :a_9, :b :b_9, :c :c_9, :d :d_9, :e :e_9, :f :f_9, :g :g_9, :h :h_9, :i :i_9, :j :j_9}}))
       ;; Vals-only
       ;; Any-col
       (is (= (set (cross-cols test-cmap col-keys :any-col :vals-only))
-             nil)))
+             #{{:a :a_0, :b :b_0, :c :c_0, :d :d_0, :e :e_0, :f :f_0, :g :g_0, :h :h_0, :i :i_0, :j :j_0}
+               {:a :a_1, :b :b_1, :c :c_1, :d :d_1, :e :e_1, :f :f_1, :g :g_1, :h :h_1, :i :i_1, :j :j_1}
+               ;; 2 -- not present
+               {:a :a_3, :b :b_3, :c :c_3, :d :d_3, :e :e_3, :f :f_3, :g :g_3, :h :h_3, :i :i_3, ,,,,,,,}
+               {:a :a_4, :b :b_4, :c :c_4, :d :d_4, :e :e_4, ,,,,,,,, :g :g_4, :h :h_4, :i :i_4, ,, ,,,,}
+               {:a :a_5, :b :b_5, :c :c_5, :d :d_5, :e :e_5, :f :f_5, :g :g_5, :h :h_5, :i :i_5, ,,,,,,,}
+               {:a :a_6, ,,,,,,,, :c :c_6, :d :d_6, :e :e_6, :f :f_6, :g :g_6, :h :h_6, :i :i_6, ,,,,,,,}
+               {:a :a_7, :b :b_7, ,,,,,,,, :d :d_7, :e :e_7, ,,,,,,,, :g :g_7, :h :h_7, :i :i_7, :j :j_7}
+               {:a :a_8, :b :b_8, :c :c_8, :d :d_8, :e :e_8, :f :f_8, :g :g_8, :h :h_8, :i :i_8, :j :j_8}
+               {:a :a_9, :b :b_9, :c :c_9, :d :d_9, :e :e_9, :f :f_9, :g :g_9, :h :h_9, :i :i_9, :j :j_9}})))
     ;; Full Cross
     (do
       ;; Default/every-row & every-col
       (is (= (set (cross test-cmap row-keys col-keys))
              (set (cross test-cmap row-keys col-keys :every-row :every-col))
-             nil)))))
+             #{[[3,:c] :c_3],[[3,:d] :d_3],[[3,:e] :e_3],
+               [[4,:c] :c_4],[[4,:d] :d_4],[[4,:e] :e_4],
+               [[5,:c] :c_5],[[5,:d] :d_5],[[5,:e] :e_5],
+               [[6,:c] :c_6],[[6,:d] :d_6],[[6,:e] :e_6]})))))
 
 (deftest
   ^{:doc "Test the cross map according to a cross-map with random dissociations."}
