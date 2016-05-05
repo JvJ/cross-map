@@ -35,6 +35,45 @@
   (def test-cmap (into (cross-map) test-pairs))
   (def test-map (into {} test-pairs)))
 
+(defn- cross-test-helper
+  "Helper function "
+  [cmap row-keys col-keys valid-row? valid-col?]
+  (->> cmap
+       (group-by (comp first key) ,,,)
+       (map (fn [[k v]]
+              [k (transduce
+                  (comp (map (fn [[[r c] vv]] [c vv]))
+                        (filter #(some ($ = (ky %)) col-keys)))
+                  conj {} v)]) ,,,)
+       (filter #(valid-col? (vl %) col-keys) ,,,)
+       (mapcat (fn [[r v]] (map (fn [[c vv]] [[r c] vv]) v)) ,,,)
+       (group-by (comp second ky) ,,,)
+       (map (fn [[k v]]
+              [k (transduce
+                  (comp (map (fn [[[r c] vv]] [r vv]))
+                        (filter #(some ($ = (ky %)) row-keys)))
+                  conj {} v)]) ,,,)
+       (filter #(valid-col? (vl %) row-keys) ,,,) 
+       (mapcat (fn [[c v]] (map (fn [[r vv]] [[r c] vv]) v)) ,,,)
+       (set ,,,)))
+
+(defn- contiguous-by
+  "Maps f to every element of the column, and determines if all
+  subsequences where f produces the same result have contiguous indices.
+  
+  For example:
+  (contiguous-by first [[1,:a],[1,:b],[2,:a],[2,:b]]) => true
+  (contiguous-by second [[1,:a],[1,:b],[2,:a],[2,:b]]) => false
+
+  In the above example, the first elements are: [1,1,2,2] and
+  the second elements are [:a,:b,:a,:b].  Matching elements are
+  not contiguous in the second one."
+  [f coll]
+  ;; LEFTOFF: Contiguity.  ALso, don't forget metadata functions
+  (transduce (<| (map-indexed #(-> [%1, (f %2)]))
+                 )
+             ))
+
 (deftest
   ^{:doc "Testing cross operations according to constant values.
 See tasks.org for the source tables."}
@@ -184,7 +223,29 @@ See tasks.org for the source tables."}
              #{[[3,:c] :c_3],[[3,:d] :d_3],[[3,:e] :e_3],
                [[4,:c] :c_4],[[4,:d] :d_4],[[4,:e] :e_4],
                [[5,:c] :c_5],[[5,:d] :d_5],[[5,:e] :e_5],
-               [[6,:c] :c_6],[[6,:d] :d_6],[[6,:e] :e_6]})))))
+               [[6,:c] :c_6],[[6,:d] :d_6],[[6,:e] :e_6]}))
+      (let [;; DIssociating this key so that the results differ
+            test-cmap (dissoc test-cmap [4,:d])]
+        (is (= (set (cross test-cmap row-keys col-keys :every-row :any-col))
+               #{[[3,:c] :c_3],[[3,:e] :e_3],
+                 [[4,:c] :c_4],[[4,:e] :e_4],
+                 [[5,:c] :c_5],[[5,:e] :e_5],
+                 [[6,:c] :c_6],[[6,:e] :e_6]}))
+        (is (= (set (cross test-cmap row-keys col-keys :any-row :every-col))
+               #{[[3,:c] :c_3],[[3,:d] :d_3],[[3,:e] :e_3],
+                 [[5,:c] :c_5],[[5,:d] :d_5],[[5,:e] :e_5],
+                 [[6,:c] :c_6],[[6,:d] :d_6],[[6,:e] :e_6]}))
+        (is (= (set (cross test-cmap row-keys col-keys :any-row :any-col))
+               #{[[3,:c] :c_3],[[3,:d] :d_3],[[3,:e] :e_3],
+                 [[4,:c] :c_4],,,,,,,,,,,,,,,[[4,:e] :e_4],
+                 [[5,:c] :c_5],[[5,:d] :d_5],[[5,:e] :e_5],
+                 [[6,:c] :c_6],[[6,:d] :d_6],[[6,:e] :e_6]}))))
+    ;; Row/col ordering
+    ;; Since these ae hash maps, there is no particular order
+    ;; However, we are guaranteed to have certain rows or columns
+    ;; grouped contiguously, depending on the options we pass in
+    (do
+      )))
 
 (deftest
   ^{:doc "Test the cross map according to a cross-map with random dissociations."}
@@ -194,9 +255,6 @@ See tasks.org for the source tables."}
         test-cmap (apply dissoc test-cmap removals)
         row-keys (take 2 (shuffle test-rows))
         col-keys (take 2 (shuffle test-cols))]
-
-    (with-test-out
-      (println "test-cmap: " test-cmap))
     
     ;; Cross-rows
     (do
@@ -287,41 +345,19 @@ See tasks.org for the source tables."}
              (set (->> test-cmap
                        rows 
                        (filter #(some (second %) col-keys))
-                       (map val)))))
-      (report {:type String :value "HEY GUYS!"}))
+                       (map val))))))
     ;; Full Cross
     (do
       ;; Default/every-row & every-col
       (is (= (set (cross test-cmap row-keys col-keys))
              (set (cross test-cmap row-keys col-keys :every-row :every-col))
-             (set (let [x
-                        (->> test-cmap
-                             (group-by (comp first key) ,,,)
-                             (eduction (comp (map (fn [[k v]]
-                                                    [k (transduce
-                                                        (comp (map (fn [[[r c] vv]] [c vv]))
-                                                              (filter #(some ($ = (ky %)) col-keys)))
-                                                        conj {} v)]))
-                                             (filter #(every? (vl %) col-keys))
-                                             (mapcat (fn [[r v]] (map (fn [[c vv]] [[r c] vv]) v)))) ,,,)
-                             ;; TODO: Just use thread instead of eduction
-                             ;; It will be slower, but that's kind of the point of
-                             ;; this test code.
-                             (group-by (comp second key) ,,,)
-                             (eduction (comp (map (fn [[k v]]
-                                                    [k (transduce
-                                                        (comp (map (fn [[[r c] vv]] [r vv]))
-                                                              (filter #(some ($ = (ky %)) row-keys)))
-                                                        conj {} v)]))
-                                             (filter #(every? (vl %) row-keys)) 
-                                             (mapcat (fn [[c v]] (map (fn [[r vv]] [[r c] vv]) v)))) ,,,))
-                        _ (println "row-keys: " row-keys)
-                        _ (println "col-keys: " col-keys)
-                        _ (println "res: " (set x))]
-                    x))))))
-
-  ;; Cross-cols
-  )
+             (cross-test-helper test-cmap row-keys col-keys every? every?)))
+      (is (= (set (cross test-cmap row-keys col-keys :every-row :any-col))
+             (cross-test-helper test-cmap row-keys col-keys every? some)))
+      (is (= (set (cross test-cmap row-keys col-keys :any-row :every-col))
+             (cross-test-helper test-cmap row-keys col-keys some every?)))
+      (is (= (set (cross test-cmap row-keys col-keys :any-row :any-col))
+             (cross-test-helper test-cmap row-keys col-keys some some))))))
 
 ;;; Confirm that cross-maps support all map operations
 (deftest map-test)
