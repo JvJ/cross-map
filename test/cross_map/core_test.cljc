@@ -57,7 +57,7 @@
        (mapcat (fn [[c v]] (map (fn [[r vv]] [[r c] vv]) v)) ,,,)
        (set ,,,)))
 
-(defn- contiguous-by
+(defn- contiguous-by?
   "Maps f to every element of the column, and determines if all
   subsequences where f produces the same result have contiguous indices.
   
@@ -69,10 +69,11 @@
   the second elements are [:a,:b,:a,:b].  Matching elements are
   not contiguous in the second one."
   [f coll]
-  ;; LEFTOFF: Contiguity.  ALso, don't forget metadata functions
-  (transduce (<| (map-indexed #(-> [%1, (f %2)]))
-                 )
-             ))
+  (->> coll
+       (partition-by f)
+       (map (<| f first))
+       (frequencies)
+       (every? #(= 1 (val %)))))
 
 (deftest
   ^{:doc "Testing cross operations according to constant values.
@@ -243,15 +244,54 @@ See tasks.org for the source tables."}
     ;; Row/col ordering
     ;; Since these ae hash maps, there is no particular order
     ;; However, we are guaranteed to have certain rows or columns
-    ;; grouped contiguously, depending on the options we pass in
+    ;; grouped contiguously, depending on the options we pass in.
     (do
-      )))
+      ;; By-rows.  We have to test for no ordering options and by-rows, since
+      ;; the default should be by-rows
+      (let [res (cross test-cmap row-keys col-keys :every-row :every-col :keys-only)]
+        (is (not-empty res))
+        (is (contiguous-by? first res)))
+      (let [res (cross test-cmap row-keys col-keys :every-row :every-col :keys-only :by-rows)]
+        (is (not-empty res))
+        (is (contiguous-by? first res)))
+      (let [res (cross test-cmap row-keys col-keys :every-row :any-col :keys-only)]
+        (is (not-empty res))
+        (is (contiguous-by? first res)))
+      (let [res (cross test-cmap row-keys col-keys :every-row :any-col :keys-only :by-rows)]
+        (is (not-empty res))
+        (is (contiguous-by? first res)))
+      (let [res (cross test-cmap row-keys col-keys :any-row :every-col :keys-only)]
+        (is (not-empty res))
+        (is (contiguous-by? first res)))
+      (let [res (cross test-cmap row-keys col-keys :any-row :every-col :keys-only :by-rows)]
+        (is (not-empty res))
+        (is (contiguous-by? first res)))
+      (let [res (cross test-cmap row-keys col-keys :any-row :any-col :keys-only)]
+        (is (not-empty res))
+        (is (contiguous-by? first res)))
+      (let [res (cross test-cmap row-keys col-keys :any-row :any-col :keys-only :by-rows)]
+        (is (not-empty res))
+        (is (contiguous-by? first res)))
+      ;; By-cols
+      (let [res (cross test-cmap row-keys col-keys :every-row :every-col :keys-only :by-cols)]
+        (is (not-empty res))
+        (is (contiguous-by? second res)))
+      (let [res (cross test-cmap row-keys col-keys :every-row :any-col :keys-only :by-cols)]
+        (is (not-empty res))
+        (is (contiguous-by? second res)))
+      (let [res (cross test-cmap row-keys col-keys :any-row :every-col :keys-only :by-cols)]
+        (is (not-empty res))
+        (is (contiguous-by? second res)))
+      (let [res (cross test-cmap row-keys col-keys :any-row :any-col :keys-only :by-cols)]
+        (is (not-empty res))
+        (is (contiguous-by? second res))))))
 
 (deftest
   ^{:doc "Test the cross map according to a cross-map with random dissociations."}
   rand-cross-test
   (let [;; Randomly dissociate a few entries
         removals (take num-removed (shuffle (keys test-cmap)))
+        _ (println "Here is ")
         test-cmap (apply dissoc test-cmap removals)
         row-keys (take 2 (shuffle test-rows))
         col-keys (take 2 (shuffle test-cols))]
@@ -357,7 +397,37 @@ See tasks.org for the source tables."}
       (is (= (set (cross test-cmap row-keys col-keys :any-row :every-col))
              (cross-test-helper test-cmap row-keys col-keys some every?)))
       (is (= (set (cross test-cmap row-keys col-keys :any-row :any-col))
-             (cross-test-helper test-cmap row-keys col-keys some some))))))
+             (cross-test-helper test-cmap row-keys col-keys some some))))
+
+    ;; Contiguity
+    (do
+      ;; By-rows.  We have to test for no ordering options and by-rows, since
+      ;; the default should be by-rows
+      (let [res (cross test-cmap row-keys col-keys :every-row :every-col :keys-only)]
+        (is (contiguous-by? first res)))
+      (let [res (cross test-cmap row-keys col-keys :every-row :every-col :keys-only :by-rows)]
+        (is (contiguous-by? first res)))
+      (let [res (cross test-cmap row-keys col-keys :every-row :any-col :keys-only)]
+        (is (contiguous-by? first res)))
+      (let [res (cross test-cmap row-keys col-keys :every-row :any-col :keys-only :by-rows)]
+        (is (contiguous-by? first res)))
+      (let [res (cross test-cmap row-keys col-keys :any-row :every-col :keys-only)]
+        (is (contiguous-by? first res)))
+      (let [res (cross test-cmap row-keys col-keys :any-row :every-col :keys-only :by-rows)]
+        (is (contiguous-by? first res)))
+      (let [res (cross test-cmap row-keys col-keys :any-row :any-col :keys-only)]
+        (is (contiguous-by? first res)))
+      (let [res (cross test-cmap row-keys col-keys :any-row :any-col :keys-only :by-rows)]
+        (is (contiguous-by? first res)))
+      ;; By-cols
+      (let [res (cross test-cmap row-keys col-keys :every-row :every-col :keys-only :by-cols)]
+        (is (contiguous-by? second res)))
+      (let [res (cross test-cmap row-keys col-keys :every-row :any-col :keys-only :by-cols)]
+        (is (contiguous-by? second res)))
+      (let [res (cross test-cmap row-keys col-keys :any-row :every-col :keys-only :by-cols)]
+        (is (contiguous-by? second res)))
+      (let [res (cross test-cmap row-keys col-keys :any-row :any-col :keys-only :by-cols)]
+        (is (contiguous-by? second res))))))
 
 ;;; Confirm that cross-maps support all map operations
 (deftest map-test)
