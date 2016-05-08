@@ -53,7 +53,7 @@
 ** Removals
    ([2,:c],[2,:e],[4,:f],[6,:b],[7,:c],[7,:f])
 
-** TODO After Removals
+** After Removals
   |   / | :a   | :b    | *:c*  | *:d*   | *:e*  | :f    | :g   | :h   | :i   | :j    |
   |-----+------+-------+-------+--------+-------+-------+------+------+------+-------|
   |   0 | :a_0 | :b_0  | :c_0  | :d_0   | :e_0  | :f_0  | :g_0 | :h_0 | :i_0 | :j_0  |
@@ -97,3 +97,32 @@
   
 
 ** Expected results from operations
+
+
+  | / | :a    | :g   |
+  |---+-------+------|
+  | 4 | *nil* | :g_4 |
+  | 9 | :a_9  | :g_9 |
+
+Fail in rand-cross-test
+expected: (=
+ (set (cross test-cmap row-keys col-keys))
+ (set (cross test-cmap row-keys col-keys :every-row :every-col))
+ (cross-test-helper test-cmap row-keys col-keys true true))
+  actual: (not
+ (= #{[[9 :a] :a_9] [[9 :g] :g_9] [[4 :g] :g_4]} #{[[9 :g] :g_9]} #{}))
+
+Fail in rand-cross-test
+expected: (=
+ (set (cross test-cmap row-keys col-keys :every-row :any-col))
+ (cross-test-helper test-cmap row-keys col-keys true false))
+  actual: (not
+ (=
+  #{[[9 :g] :g_9] [[4 :g] :g_4]}
+  #{[[9 :a] :a_9] [[9 :g] :g_9] [[4 :g] :g_4]}))
+
+Fail in rand-cross-test
+expected: (=
+ (set (cross test-cmap row-keys col-keys :any-row :every-col))
+ (cross-test-helper test-cmap row-keys col-keys false true))
+  actual: (not (= #{[[9 :a] :a_9] [[9 :g] :g_9]} #{}))

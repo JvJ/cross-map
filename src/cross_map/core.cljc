@@ -140,7 +140,6 @@
         
         by-rows (or by-rows (not by-cols))
 
-        
         [pri every-pri any-pri pri-keys
          sec every-sec any-sec sec-keys]
         (if by-rows
@@ -149,6 +148,8 @@
           [(. this colIdx) every-col any-col c-keys
            (. this rowIdx) every-row any-row r-keys])
 
+        make-key (if by-rows #(-> [%1 %2]) #(-> [%2 %1]))
+        
         ;; (every? ()) is always true,
         ;; so we can treat it as (some <all-keys>)
         [every-pri pri-keys] (if (and (empty? pri-keys)
@@ -174,7 +175,7 @@
     (for [pk pri-keys
           :when (valid-pri? pk)
           sk sec-keys
-          :let [entry (find (. this mainMap) [pk sk])]
+          :let [entry (find (. this mainMap) (make-key pk sk))]
           :when (and entry (valid-sec? sk))]
       entry)))
 
@@ -303,69 +304,7 @@
                           any-col every-col
                           keys-only vals-only
                           by-rows by-cols] :as opts}]
-       (let [_ (and every-row any-row
-                    (throw (Err "Cannot specify both :any-row and :every-row.")))
-             opts (disj opts :any-row :every-row)
-             _ (and every-col any-col
-                    (throw (Err "Cannot specify both :any-col and :every-col.")))
-             opts (disj opts :any-col :every-col)
-             _ (and keys-only vals-only
-                    (throw (Err "Cannot specify both :keys-only and :vals-only.")))
-             opts (disj opts :keys-only :vals-only)
-             _ (and by-rows by-cols
-                    (throw (Err "Cannot specify both :by-rows and :by-cols.")))
-             opts (disj opts :by-rows :by-cols)
-             _ (if-not (empty? opts)
-                 (throw (Err (str "Unsupported options: " opts))))
-             
-             ;; Doing a quick little memoization with volatiles
-             ;; instead of atoms. #ThugLife #BreakingTheLaw
-             checkfn (fn [f coll]
-                       (let [v (volatile! (transient {}))]
-                         (fn [k]
-                           (or (@v k)
-                               (let [ret (f k coll)]
-                                 (vswap! v assoc! k ret)
-                                 ret)))))
-
-             by-rows (or by-rows (not by-cols))
-             
-             [pri every-pri any-pri pri-keys
-              sec every-sec any-sec sec-keys]
-             (if by-rows
-               [rowIdx every-row any-row r-keys
-                colIdx every-col any-col c-keys]
-               [colIdx every-col any-col c-keys
-                rowIdx every-row any-row r-keys])
-
-             ;; (every? ()) is always true,
-             ;; so we can treat it as (some <all-keys>)
-             [every-pri pri-keys] (if (and (empty? pri-keys)
-                                           (or every-pri (not any-pri)))
-                                    [false (keys pri)]
-                                    [every-pri pri-keys])
-             [every-sec sec-keys] (if (and (empty? sec-keys)
-                                           (or every-sec (not any-sec)))
-                                    [false (keys sec)]
-                                    [every-sec sec-keys])
-
-             ;; A valid column must check all/any rows
-             valid-pri? (checkfn (if every-sec
-                                   #(and (pri %1) (every? (pri %1) %2))
-                                   #(and (pri %1) (some (pri %1) %2)))
-                                 sec-keys)
-
-             ;; A valid row must check all/any columns
-             valid-sec? (checkfn (if every-pri
-                                   #(and (sec %1) (every? (sec %1) %2))
-                                   #(and (sec %1) (some (sec %1) %2)))
-                                 pri-keys)]
-         (for [pk pri-keys
-               :when (valid-pri? pk)
-               sk sec-keys
-               :let [entry (find mainMap [pk sk])]
-               :when (and entry (valid-sec? sk))]
-           entry)))
+       (cross-index-helper this r-keys c-keys opts))
      
      #_IEditableCollection ; For turning this into a transient structure
      #_(asTransient [this]

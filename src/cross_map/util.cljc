@@ -15,7 +15,7 @@
 (defmacro |>
   "Alias for reverse composition."
   [& body]
-  `(copm ~@(reverse body)))
+  `(comp ~@(reverse body)))
 
 (defmacro Err
   "Create an exception in clj or cljs."
