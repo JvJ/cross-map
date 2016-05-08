@@ -96,8 +96,8 @@
         ;; An accumulator, for efficiency.  Only used in "any" case
         tags-v (if-not every (volatile! (transient #{})))]
     (for [[pk sk] ps-keys 
-          :when (and (or (and tags-v (not (@tags-v sk)))
-                         every)
+          :when (and (or every
+                      (and tags-v (not (@tags-v sk))))
                      (valid? (sec sk) selected-keys))
           :let [_ (and tags-v (vswap! tags-v conj! sk))]]
       (case kv-mode
