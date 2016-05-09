@@ -213,12 +213,14 @@
            cm
            order)))
 
+;; Profiles to about 29 ms... but not as flexible
 (defn run-systems-single'
   "Applies to single components only."
   ([cm] (run-systems-single' system-order' cm))
   ([order cm]
    (reduce (fn [acc f]
-             (into acc (mapcat f) (cross-cols acc (get-profile f))))
+             (into acc (map f)
+                   (cross-cols acc (get-profile f))))
            cm order)))
 ;; LEFTOFF: How to do it??
 ;; Also, transients?

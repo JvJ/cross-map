@@ -2,7 +2,9 @@
   "Defines operations on the cross-map data structure."
 
   (:require [cross-map.util :as u
-             :refer [pair? dissoc-in #?(:clj Err)]])
+             :refer [pair? dissoc-in
+                     assoc-in! update! update-in!
+                     dissoc-in! #?(:clj Err)]])
   
   #?(:cljs
      (:require-macros [cross-map.util :as u
@@ -20,6 +22,7 @@
                             MapEntry
                             IEditableCollection
                             ITransientMap
+                            ITransientVector
                             Counted)
               (java.util Map)
               (java.io Serializable))))
@@ -306,8 +309,8 @@
                           by-rows by-cols] :as opts}]
        (cross-index-helper this r-keys c-keys opts))
      
-     #_IEditableCollection ; For turning this into a transient structure
-     #_(asTransient [this]
+     IEditableCollection ; For turning this into a transient structure
+     (asTransient [this]
        (transient-cross-map (transient mainMap)
                             (reduce (fn [acc [k v]]
                                       (assoc! acc k (transient v)))
@@ -316,7 +319,9 @@
                             (reduce (fn [acc [k v]]
                                       (assoc! acc k (transient v)))
                                     (transient colIdx)
-                                    colIdx)))
+                                    colIdx)
+                            (transient (vec (keys rowIdx)))
+                            (transient (vec (keys colIdx)))))
      
      MapEquivalence
 
@@ -441,15 +446,72 @@
    (deftype TransientCrossMap
        [^ITransientMap ^:volatile-mutable !mainMap
         ^ITransientMap ^:volatile-mutable !rowIdx
-        ^ITransientMap ^:volatile-mutable !colIdx]))
+        ^ITransientMap ^:volatile-mutable !colIdx
+        ^ITransientVector ^:volatile-mutable !rowKeys
+        ^ITransientVector ^:volatile-mutable !colKeys]
+
+     Object
+     (toString [this] (.toString !mainMap))
+
+     ILookup ; Implements get behaviour
+     (valAt [this ky]
+       (get !mainMap ky))
+     (valAt [this ky not-found]
+       (get !mainMap ky not-found))
+
+     ITransientMap
+     (assoc [this k v]
+       (set! (. this !mainMap) (assoc! !mainMap k v))
+       (when-let [[r c] (and (pair? k) k)]
+         (if-not (get !rowIdx r) (set! (. this !rowKeys) (conj! !rowKeys r)))
+         (set! (. this !rowIdx) (assoc-in! !rowIdx [r c] v))
+         (if-not (get !colIdx c) (set! (. this !colKeys) (conj! !colKeys c)))
+         (set! (. this !colIdx) (assoc-in! !colIdx [c r] v)))
+       this)
+     
+     (without [this k]
+       (set! (. this !mainMap) (dissoc! !mainMap k))
+       (when-let [[r c] (and (pair? k) k)]
+         (set! (. this !rowIdx) (dissoc-in! !rowIdx [r c])) 
+         (set! (. this !colIdx) (dissoc-in! !colIdx [c r])))
+       this)
+     
+     (persistent [this]
+       (let [p-row-ks (persistent! !rowKeys)
+             _ (println "row keys: " p-row-ks)
+             p-col-ks (persistent! !colKeys)
+             _ (println "col keys: " p-col-ks)]
+         (set! (. this !rowIdx) (reduce (fn [!acc k]
+                                          (if-let [m (get !acc k)]
+                                            (assoc! !acc k (persistent! m))
+                                            !acc))
+                                        !rowIdx
+                                        p-row-ks))
+         (set! (. this !colIdx) (reduce (fn [!acc k]
+                                          (if-let [m (get !acc k)]
+                                            (assoc! !acc k (persistent! m))
+                                            !acc))
+                                        !colIdx
+                                        p-col-ks))
+         (PersistentCrossMap. (persistent! !mainMap)
+                              (persistent! !rowIdx)
+                              (persistent! !colIdx))))
+
+     ;; Implements conj! behaviour
+     (conj [this o]
+       (let [[k v] o]
+         (assoc! this k v)))
+
+     (count [this]
+       (count !mainMap))))
 
 ;;;; CLJS Transient Implementation
 
 ;;;; Forward-declared constructor proxies.
 ;;;; Necessary since deftypes can't be forward-declared.
 (defn- transient-cross-map
-  [!mainMap !rowIdx !colIdx]
-  (TransientCrossMap. !mainMap !rowIdx !colIdx))
+  [!mainMap !rowIdx !colIdx !rowKeys !colKeys]
+  (TransientCrossMap. !mainMap !rowIdx !colIdx !rowKeys !colKeys))
 
 ;;;; API - shared across platforms
 (defn cross-rows
