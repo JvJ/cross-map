@@ -451,4 +451,4 @@ See tasks.org for the source tables."}
 (defn test-ns-hook
   []
   (const-cross-test)
-  (rand-cross-test))
+  #_(rand-cross-test))

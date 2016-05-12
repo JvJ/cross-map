@@ -1,10 +1,12 @@
 (ns cross-map.core
   "Defines operations on the cross-map data structure."
 
-  (:require [cross-map.util :as u
+  (:require [clojure.set :as cst :refer [intersection]]
+            [cross-map.util :as u
              :refer [pair? dissoc-in
                      assoc-in! update! update-in!
-                     dissoc-in! #?(:clj Err)]])
+                     dissoc-in! #?(:clj Err)
+                     kvp]])
   
   #?(:cljs
      (:require-macros [cross-map.util :as u
@@ -104,7 +106,8 @@
                       (@invalids-v sk) false
                       :else (let [v (valid? (sec sk) selected-keys)]
                               (vswap! (if v valids-v invalids-v)
-                                     conj! sk)))]
+                                      conj! sk)
+                              v))]
       (case kv-mode
         :keys-only sk
         :vals-only (with-meta (sec sk)
@@ -296,7 +299,7 @@
      (crossIndexCols [this c-keys
                          {:keys [any every
                                  any-col every-col
-                                 keys-only vals-only] :as opts}]
+                                 keys-only vals-only] :as opts}]       
        (cross-rows-cols-helper this false c-keys
                            (-> opts
                                (disj :any-col :every-col)
@@ -311,8 +314,8 @@
                           by-rows by-cols] :as opts}]
        (cross-index-helper this r-keys c-keys opts))
      
-     IEditableCollection ; For turning this into a transient structure
-     (asTransient [this]
+     #_IEditableCollection ; For turning this into a transient structure
+     #_(asTransient [this]
        (transient-cross-map (transient mainMap)
                             (reduce (fn [acc [k v]]
                                       (assoc! acc k (transient v)))

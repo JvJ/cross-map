@@ -14,8 +14,8 @@
   (:require [clojure.set :as cst
              :refer [union intersection]]
             [cross-map.util :as u
-             :refer [sassoc ssconj sconj #?(:clj Err)
-                     kvp pair?]]
+             :refer [ssconj sconj #?(:clj Err)
+                     kvp pair? update!]]
             [cross-map.hist-map :as hm
              :refer [hist-map map->hist-map same?
                      adds rems clear]])

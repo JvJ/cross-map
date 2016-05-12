@@ -127,8 +127,8 @@
      (assoc m k v)
      (sorted-map k v)))
   ([m k v & {:as kvs}]
-   (reduce-kv sassoc
-              (sassoc m k v)
+   (reduce-kv ssassoc
+              (ssassoc m k v)
               kvs)))
 
 (defn sconj
