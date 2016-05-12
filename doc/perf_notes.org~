@@ -1,0 +1,18 @@
+#+TITLE: Performance Notes
+
+
+* Reassoc Tests
+  
+  These tests measure how efficient different structures are at
+  continuously associating different values.
+
+  Params: All structures have values 0..999 under keys 0..999.
+  
+  | Collection  | Avg. Runtime |
+  |-------------+--------------|
+  | Vector      | 1.597937 ms  |
+  | TransVector | 1.378711 ms  |
+  | Map         |              |
+  | TransMap    |              |
+  | Set         |              |
+  | TransSet    |              |

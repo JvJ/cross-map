@@ -97,12 +97,14 @@
                           [pk sk]))
 
         ;; An accumulator, for efficiency.  Only used in "any" case
-        tags-v (if-not every (volatile! (transient #{})))]
+        valids-v (volatile! (transient #{}))
+        invalids-v (volatile! (transient #{}))]
     (for [[pk sk] ps-keys 
-          :when (and (or every
-                      (and tags-v (not (@tags-v sk))))
-                     (valid? (sec sk) selected-keys))
-          :let [_ (and tags-v (vswap! tags-v conj! sk))]]
+          :when (cond (@valids-v sk) true
+                      (@invalids-v sk) false
+                      :else (let [v (valid? (sec sk) selected-keys)]
+                              (vswap! (if v valids-v invalids-v)
+                                     conj! sk)))]
       (case kv-mode
         :keys-only sk
         :vals-only (with-meta (sec sk)
@@ -461,41 +463,39 @@
 
      ITransientMap
      (assoc [this k v]
-       (set! (. this !mainMap) (assoc! !mainMap k v))
+       (set! !mainMap (assoc! !mainMap k v))
        (when-let [[r c] (and (pair? k) k)]
          (if-not (get !rowIdx r) (set! (. this !rowKeys) (conj! !rowKeys r)))
-         (set! (. this !rowIdx) (assoc-in! !rowIdx [r c] v))
+         (set! !rowIdx (assoc-in! !rowIdx [r c] v))
          (if-not (get !colIdx c) (set! (. this !colKeys) (conj! !colKeys c)))
-         (set! (. this !colIdx) (assoc-in! !colIdx [c r] v)))
+         (set! !colIdx (assoc-in! !colIdx [c r] v)))
        this)
      
      (without [this k]
-       (set! (. this !mainMap) (dissoc! !mainMap k))
+       (set! !mainMap (dissoc! !mainMap k))
        (when-let [[r c] (and (pair? k) k)]
-         (set! (. this !rowIdx) (dissoc-in! !rowIdx [r c])) 
-         (set! (. this !colIdx) (dissoc-in! !colIdx [c r])))
+         (set! !rowIdx (dissoc-in! !rowIdx [r c])) 
+         (set! !colIdx (dissoc-in! !colIdx [c r])))
        this)
      
      (persistent [this]
        (let [p-row-ks (persistent! !rowKeys)
-             _ (println "row keys: " p-row-ks)
              p-col-ks (persistent! !colKeys)
-             _ (println "col keys: " p-col-ks)]
-         (set! (. this !rowIdx) (reduce (fn [!acc k]
-                                          (if-let [m (get !acc k)]
-                                            (assoc! !acc k (persistent! m))
-                                            !acc))
-                                        !rowIdx
-                                        p-row-ks))
-         (set! (. this !colIdx) (reduce (fn [!acc k]
-                                          (if-let [m (get !acc k)]
-                                            (assoc! !acc k (persistent! m))
-                                            !acc))
-                                        !colIdx
-                                        p-col-ks))
+             ri (reduce (fn [!acc k]
+                          (if-let [m (get !acc k)]
+                            (assoc! !acc k (persistent! m))
+                            !acc))
+                        !rowIdx
+                        p-row-ks)
+             ci (reduce (fn [!acc k]
+                          (if-let [m (get !acc k)]
+                            (assoc! !acc k (persistent! m))
+                            !acc))
+                        !colIdx
+                        p-col-ks)]
          (PersistentCrossMap. (persistent! !mainMap)
-                              (persistent! !rowIdx)
-                              (persistent! !colIdx))))
+                              (persistent! ri)
+                              (persistent! ci))))
 
      ;; Implements conj! behaviour
      (conj [this o]

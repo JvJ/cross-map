@@ -89,7 +89,9 @@
     :Orientation [1.0 0.0]
     :Spin [(rand)]}])
 
-#_(defn new-entity-fast
+(defrecord vec2 [^Double x ^Double y])
+
+(defn new-entity-fast
   )
 
 ;; TODO: Should a function like this

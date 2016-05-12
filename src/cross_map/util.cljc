@@ -23,6 +23,12 @@
   #?(:clj  `(Exception. ~@body)
      :cljc `(js/Error. ~@body)))
 
+(defn new-uuid
+  "Generate a random UUID in clojure or clojurescript."
+  []
+  #?(:clj (java.util.UUID/randomUUID)
+     :cljs (random-uuid)))
+
 (defn pair?
   "Utility function that determines whether a value is
   a two-element vector."
@@ -112,3 +118,37 @@
           (dissoc! m k)))
       m)
     (dissoc! m k)))
+
+(defn ssassoc
+  "A version of assoc which defaults to a sorted-map
+  when associating to nil."
+  ([m k v]
+   (if m
+     (assoc m k v)
+     (sorted-map k v)))
+  ([m k v & {:as kvs}]
+   (reduce-kv sassoc
+              (sassoc m k v)
+              kvs)))
+
+(defn sconj
+  "Conj that defaults to a set when conjing to nil."
+  ([coll k]
+   (conj (or coll #{}) k))
+  ([coll k & ks]
+   (reduce sconj (sconj coll k) ks)))
+
+(defn ssconj
+  "A version of conj that defaults to a sorted-map
+  when conjing onto nil."
+  ([coll k]
+   (conj (or coll (sorted-set)) k))
+  ([coll k & ks]
+   (reduce ssconj (ssconj coll k) ks)))
+
+(defn sconj!
+  "Like sconj, but for transient sets."
+  ([coll k]
+   (conj! (or coll (transient #{})))))
+
+

@@ -1,0 +1,72 @@
+(ns cross-map.hist-map-test
+  (:require [clojure.set :as cljset
+             :refer [union intersection difference]]
+            [cross-map.hist-map :as hm :refer :all]
+            #?(:clj [clojure.test :as t :refer [deftest is]]
+               :cljs [cljs.test :as t :include-macros true
+                      ;; TODO: This may break in cljs.  We'll see...
+                      :refer [deftest is]])))
+
+
+;;; Some very basic tests
+
+(deftest random-assocs
+
+  (let [key-seq (shuffle (range 1000))
+        key-set (set key-seq)
+        
+        init {:acc (hist-map)
+              :adds #{}
+              :rems #{}
+              :no-rems #{}}
+
+        {:keys [acc adds rems no-rems] :as results}
+        (reduce (fn [{m :acc a :adds
+                      r :rems nr :no-rems}
+                     k]
+                  (if (>= 0.5 (rand))
+                    ;; Then - assoc
+                    {:acc (assoc m k k)
+                     :adds (conj a k)
+                     :rems (disj r k)
+                     :no-rems (disj nr k)}
+                    ;; Else - dissoc
+                    {:acc (dissoc m k)
+                     :adds a
+                     :rems (if (contains? a k)
+                             (conj r k)
+                             r)
+                     :no-rems (if (contains? a k)
+                                nr
+                                (conj nr k))}))
+                init
+                key-seq)]
+
+    ;; The maps addiions/removals have to match ours
+    (and
+     ;; The first two tests need to pass for the others to
+     ;; be executed
+     (is (= adds
+            (-> acc meta ::hm/additions)
+            ()))
+     (is (= rems (-> acc meta ::hm/removals)))
+
+     ;; The no-rems can't be in any other sets
+     (do
+      (is (not (some no-rems (union adds rems))))
+
+      ;; The map must have maintained the same UUID
+      (is (= (-> init :acc meta ::hm/id)
+             (-> acc meta ::hm/id)))
+      
+      ;; Make sure that all keys are mutually exclusive
+      (is (empty? (intersection adds rems)))
+      (is (empty? (intersection rems no-rems)))
+      (is (empty? (intersection adds no-rems)))
+
+      ;; Union must be exactly the same we started with
+      (is (= (union adds rems no-rems) key-set))))))
+
+(defn test-ns-hook
+  []
+  (random-assocs))

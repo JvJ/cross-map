@@ -1,0 +1,63 @@
+(ns cross-map.perf-baseline
+  "Some general performance tests to compare others against."
+  (:require [criterium.core :as cri :refer [bench benchmark]]
+            #?(:clj [clojure.test :as t]
+                :cljs [cljs.test :as t :include-macros true])))
+
+
+(defn setnil
+  [coll k]
+  (assoc coll k nil))
+
+(defn setnil!
+  [coll k]
+  (assoc! coll k nil))
+
+(defn assock
+  [coll k]
+  (assoc coll k k))
+
+(defn assock!
+  [coll k]
+  (assoc! coll k k))
+
+(defn reassoc
+  "Tests the efficiency of collections by constantly
+  associating and dissociating keys of the coll.
+
+  Add-fn and rem-fn are functions that take a coll and
+  a key, and add or remove that key from the coll."
+  [coll add-fn rem-fn times key-seq]
+  (loop [c coll
+         i 0
+         [k & ks] key-seq]
+    (if (>= i times)
+      coll
+      (-> coll
+          (rem-fn k)
+          (add-fn k)
+          (recur (inc i) ks)))))
+
+(defn run-bench
+  [n coll-type]
+  (let [[coll add-fn rem-fn]
+        (case coll-type
+          :vec   [(vec (range n)) assock setnil]
+          :t-vec [(transient (vec (range n))) assock! setnil!]
+          :map   [(reduce assock {} (range n)) assock dissoc]
+          :t-map [(transient (reduce assock {} (range n))) assock! dissoc!]
+          :set   [(reduce conj #{} (range n)) conj disj]
+          :t-set [(transient (reduce conj #{} (range n))) conj! disj!]
+          (println "Invalid option: " coll-type))]
+    (benchmark (reassoc coll add-fn rem-fn n (repeatedly #(rand-int 1000))) {})))
+
+(defonce results (atom nil))
+
+(defn run-em-all
+  [n]
+  (reset! results
+         (reduce (fn [acc t]
+                   (assoc acc t (dissoc (run-bench n t) :results)))
+                 {}
+                 [:vec :t-vec :map :t-map :set :t-set]))
+  nil)

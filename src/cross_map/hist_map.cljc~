@@ -1,0 +1,18 @@
+(ns cross-map.hist-map
+
+  #?(:clj
+     (:import (clojure.lang IPersistentMap
+                            IPersistentSet
+                            ILookup
+                            IObj
+                            MapEquivalence
+                            IFn
+                            SeqIterator
+                            MapEntry
+                            IEditableCollection
+                            ITransientMap
+                            ITransientVector
+                            Counted)
+              (java.util Map)
+              (java.io Serializable))))
+

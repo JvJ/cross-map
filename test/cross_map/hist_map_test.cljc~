@@ -1,0 +1,33 @@
+(ns cross-map.hist-map
+  (:require [cross-map.hist-map :as sut :refer :all]
+            #?(:clj [clojure.test :as t :refer [deftest]]
+               :cljs [cljs.test :as t :include-macros true])))
+
+
+;;; Some very basic tests
+
+(deftest random-assocs
+
+  (let [key-seq (shuffle (range 1000))
+        key-set (set key-seq)
+        {:keys [acc adds rems no-rems] :as init}
+        [(hist-map) #{} #{} #{}]]
+    (reduce (fn [[m a r nr] k]
+              (if (>= 0.5 (rand) assoc)
+                {:acc (assoc m k k)
+                 :adds (conj a k)
+                 :rems (disj r k)
+                 :no-rems (disj nr k)}
+                ;; Else
+                {:acc (dissoc m k)
+                 :adds a
+                 :rems (if (contains? a k)
+                         (conj rems k)
+                         rems)
+                 :no-rems (if (contains? a k)
+                            no-rems
+                            (conj no-rems k))}))))
+  )
+
+(defn test-ns-hook
+  [])
