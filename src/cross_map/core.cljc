@@ -467,7 +467,7 @@
      ITransientMap
      (assoc [this k v]
        (set! !mainMap (assoc! !mainMap k v))
-       (when-let [[r c] (and (pair? k) k)]
+       (when-let [[r c] (and (xpair? k) k)]
          (if-not (get !rowIdx r) (set! (. this !rowKeys) (conj! !rowKeys r)))
          (set! !rowIdx (assoc-in! !rowIdx [r c] v))
          (if-not (get !colIdx c) (set! (. this !colKeys) (conj! !colKeys c)))

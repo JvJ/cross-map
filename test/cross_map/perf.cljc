@@ -313,3 +313,6 @@
       (bench (run-systems-nocross! order ents))
       (run-systems-nocross! order ents))))
 
+
+
+;;;; A third attempt - does using structs improve anything?

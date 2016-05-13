@@ -147,3 +147,47 @@
         (when @bl (vreset! sm (inc @sm))))
       (vreset! i (inc @i)))
     @sm))
+
+
+;;; V+ Tests
+;;; Implementing floating-point vectors as:
+;;; structs, deftype, vector
+(defrecord v2r
+    [^Double x ^Double y])
+
+(defn rv+
+  [^v2r v1 ^v2r v2]
+  (v2r. (+ (.x v1) (.x v2))
+        (+ (.y v1) (.y v2))))
+
+(deftype v2t
+    [^Double x ^Double y])
+
+(defn tv+
+  [^v2t v1 ^v2t v2]
+  (v2t. (+ (.x v1) (.x v2))
+        (+ (.y v1) (.y v2))))
+
+(defn vv+
+  [v1 v2]
+  (mapv + v1 v2))
+
+
+(defn testvecs
+  "Tests the vector add operations by reducing a
+  random list by each of the v+ operations on
+  identical sets of random vectors"
+  [n]
+  (let [nums (repeatedly (* 2 n) rand)
+        vpairs (partition 2 nums)
+        v2r-list (apply list (map (fn [[x y]] (v2r. x y)) vpairs))
+        v2t-list (apply list (map (fn [[x y]] (v2t. x y)) vpairs))
+        v2v-list (apply list (map vec vpairs))]
+    (println "V2 Record:")
+    (bench (reduce rv+ v2r-list))
+    (println "V2 Type:")
+    (bench (reduce tv+ v2t-list))
+    (println "V2 Vector:")
+    (bench (reduce vv+ v2v-list))
+    (println "Just Doubles:")
+    (bench (reduce + nums))))
