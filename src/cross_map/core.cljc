@@ -6,7 +6,8 @@
              :refer [pair? dissoc-in
                      assoc-in! update! update-in!
                      dissoc-in! #?(:clj Err)
-                     kvp]])
+                     kvp 
+                     munion mintersection]])
   
   #?(:cljs
      (:require-macros [cross-map.util :as u
@@ -44,7 +45,7 @@
   (crossIndexCols [this c-keys opts] "Full-map cross-section by col-first.")
   (crossIndex [this r-keys c-keys opts] "Cross section of elements in all specified rows and all specified columns."))
 
-(defn- cross-rows-cols-helper
+(defn- cross-rows-cols-helper1
   "crossIndexRows and crossIndexColumns are the same if you switch
   around instances of rowIdx and colIdx.  Pass in true to rows? to
   iterate over rows.  False to iterate over columns.
@@ -113,6 +114,52 @@
         :vals-only (with-meta (sec sk)
                      {(if rows? :col :row) sk})
         [sk (sec sk)]))))
+
+(defn- cross-rows-cols-helper2
+  [this rows? selected-keys
+   {:keys [every any keys-only vals-only] :as opts}]
+  (let [_ (and any every
+               (throw (Err
+                       (if rows?
+                         ":any-row and :every-row cannot both be specified."
+                         ":any-col and :every-col cannot both be specified."))))
+        opts (disj opts :any :every)
+        _ (and keys-only vals-only   
+               (throw (Err (str "Invalid key/value options: " opts))))
+        opts (disj opts :keys-only :vals-only)
+        _ (if-not (empty? opts)
+            (throw (Err (str "Unsupported options: " opts))))
+
+        rowIdx (.rowIdx this)
+        colIdx (.colIdx this)
+
+        ;; The primary and secondary iteration dimensions - row or column
+        [pri sec] (if rows? [rowIdx colIdx] [colIdx rowIdx])
+        
+        ;; Default options
+        no-keys (empty? selected-keys)
+        every (and (not no-keys)
+                   (or every (not any)))
+        selected-keys (or (seq selected-keys) (keys pri))
+        kv-mode (or keys-only vals-only)
+
+        combine (if every mintersection munion)
+
+        selected-pri (map pri selected-keys)
+        min-pri (apply min-key count selected-pri)
+        combined-idx (transduce (filter #(not (identical? min-pri %)))
+                                combine
+                                min-pri
+                                selected-pri)]
+    (for [k (keys combined-idx)]
+      (case kv-mode
+        :keys-only k
+        :vals-only (with-meta (sec k)
+                     {(if rows? :col :row) k})
+        (find sec k)))))
+
+(def cross-rows-cols-helper
+  cross-rows-cols-helper2)
 
 (defn- cross-index-helper
   "Helper functoin for full cross indexing."
@@ -314,19 +361,14 @@
                           by-rows by-cols] :as opts}]
        (cross-index-helper this r-keys c-keys opts))
      
-     #_IEditableCollection ; For turning this into a transient structure
-     #_(asTransient [this]
+     IEditableCollection ; For turning this into a transient structure
+     (asTransient [this]
        (transient-cross-map (transient mainMap)
-                            (reduce (fn [acc [k v]]
-                                      (assoc! acc k (transient v)))
-                                    (transient rowIdx)
-                                    rowIdx)
-                            (reduce (fn [acc [k v]]
-                                      (assoc! acc k (transient v)))
-                                    (transient colIdx)
-                                    colIdx)
-                            (transient (vec (keys rowIdx)))
-                            (transient (vec (keys colIdx)))))
+                            (transient rowIdx)
+                            (transient (reduce-kv (fn [acc k v]
+                                                    (assoc acc k (transient v)))
+                                                  colIdx
+                                                  colIdx))))
      
      MapEquivalence
 
@@ -447,13 +489,26 @@
      ))
 
 ;;;; CLJ Transient Implementation
+;;;; This implementation uses transients
+;;;; as the main maps and row/col idxs.
+;;;; However, they row/col idxs do not nest transients!!
+;;;; The structure is a little unusual:
+;;;; The top-level rowIdx and colIdx maps are different.
+;;;; Here, we optimize on the few-cols many-rows scenario.
+
+;;;; Cols has more levels of transience
+;;;; (i.e. !colIdx -> transient
+;;;;       (!colIdx :a) -> transient
+;;;;       ((!colIdx :a) 1) -> persistent)
+;;;; !rowIdx is a transient map of persistents
+;;;; (i.e. !rowIdx -> transient
+;;;;       (!rowIdx 1) -> persistent
+;;;;       ((!rowIdx 1) :a) -> persistent)
 #?(:clj
    (deftype TransientCrossMap
        [^ITransientMap ^:volatile-mutable !mainMap
         ^ITransientMap ^:volatile-mutable !rowIdx
-        ^ITransientMap ^:volatile-mutable !colIdx
-        ^ITransientVector ^:volatile-mutable !rowKeys
-        ^ITransientVector ^:volatile-mutable !colKeys]
+        ^ITransientMap ^:volatile-mutable !colIdx]
 
      Object
      (toString [this] (.toString !mainMap))
@@ -467,38 +522,49 @@
      ITransientMap
      (assoc [this k v]
        (set! !mainMap (assoc! !mainMap k v))
-       (when-let [[r c] (and (xpair? k) k)]
-         (if-not (get !rowIdx r) (set! (. this !rowKeys) (conj! !rowKeys r)))
-         (set! !rowIdx (assoc-in! !rowIdx [r c] v))
-         (if-not (get !colIdx c) (set! (. this !colKeys) (conj! !colKeys c)))
-         (set! !colIdx (assoc-in! !colIdx [c r] v)))
+       (when-let [[r c] (and (pair? k) k)]
+         (set! !rowIdx (assoc! !rowIdx r
+                               (let [rw (or (!rowIdx r) {})]
+                                 (assoc-in rw [r c] v))))
+         (set! !colIdx (assoc! !colIdx c
+                               (let [!cl (or (!colIdx c) (transient {}))]
+                                 (assoc! !cl r
+                                         (assoc (!cl r) c v))))))
        this)
      
      (without [this k]
        (set! !mainMap (dissoc! !mainMap k))
        (when-let [[r c] (and (pair? k) k)]
-         (set! !rowIdx (dissoc-in! !rowIdx [r c])) 
-         (set! !colIdx (dissoc-in! !colIdx [c r])))
+         (set! !rowIdx (let [rw (!rowIdx r)
+                             rwc (rw c)
+                             rwc (and rwc (dissoc rwc c))
+                             res (if (empty? rwc)
+                                   (dissoc rw c)
+                                   (assoc rw c rwc))]
+                         (if (empty? res)
+                           (dissoc! !rowIdx r)
+                           (assoc! !rowIdx r res)))) 
+         (set! !colIdx (let [!cl (!colIdx c)
+                             clr (!cl r)
+                             clr (and clr (dissoc clr r))
+                             res (if (empty? clr)
+                                   (dissoc! !cl r)
+                                   (assoc! !cl r clr))]
+                         (if (= 0 (count res))
+                           (dissoc! !colIdx c)
+                           (assoc! !colIdx c res)))))
        this)
      
      (persistent [this]
-       (let [p-row-ks (persistent! !rowKeys)
-             p-col-ks (persistent! !colKeys)
-             ri (reduce (fn [!acc k]
-                          (if-let [m (get !acc k)]
-                            (assoc! !acc k (persistent! m))
-                            !acc))
-                        !rowIdx
-                        p-row-ks)
-             ci (reduce (fn [!acc k]
-                          (if-let [m (get !acc k)]
-                            (assoc! !acc k (persistent! m))
-                            !acc))
-                        !colIdx
-                        p-col-ks)]
+       (let [ri (persistent! !rowIdx)
+             ci (persistent! !colIdx)
+             ci (reduce-kv (fn [acc k v]
+                             (assoc acc k (persistent! v)))
+                           ci
+                           ci)]
          (PersistentCrossMap. (persistent! !mainMap)
-                              (persistent! ri)
-                              (persistent! ci))))
+                              ri
+                              ci)))
 
      ;; Implements conj! behaviour
      (conj [this o]
@@ -513,8 +579,8 @@
 ;;;; Forward-declared constructor proxies.
 ;;;; Necessary since deftypes can't be forward-declared.
 (defn- transient-cross-map
-  [!mainMap !rowIdx !colIdx !rowKeys !colKeys]
-  (TransientCrossMap. !mainMap !rowIdx !colIdx !rowKeys !colKeys))
+  [!mainMap !rowIdx !colIdx]
+  (TransientCrossMap. !mainMap !rowIdx !colIdx))
 
 ;;;; API - shared across platforms
 (defn cross-rows

@@ -1,6 +1,13 @@
 #+TITLE: Performance Notes
 
 
+* Entity-component tests
+  These tests are in perf.cljc
+
+  |         | helper1      | helper2 |
+  |---------+--------------+---------|
+  | single' | 42.714600 ms |         |
+
 * Reassoc Tests
   
   These tests measure how efficient different structures are at

@@ -22,7 +22,8 @@
                                   [org.clojure/tools.nrepl "0.2.12"]
                                   [compojure "1.4.0"]
                                   [com.stuartsierra/component "0.3.1"]
-                                  [acyclic/squiggly-clojure "0.1.4"]]
+                                  [acyclic/squiggly-clojure "0.1.4"]
+                                  [net.mikera/core.matrix "0.52.0"]]
                    
                    :source-paths ["src" "dev"]
 

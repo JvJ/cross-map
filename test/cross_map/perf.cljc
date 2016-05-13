@@ -4,11 +4,11 @@
   the expected use case for the SPECS system."
   (:require [cross-map.core :refer [cross-map cross-cols rows cols]]
             [cross-map.util :refer [kvp]]
+            [clojure.core.matrix :as mtx :refer [add]]
             #?(:clj [clojure.test :as t]
                 :cljs [cljs.test :as t :include-macros true])
-             #?(:clj [criterium.core :as cri :refer [bench benchmark]]))
+            #?(:clj [criterium.core :as cri :refer [bench benchmark]]))
   #?(:clj (:import java.lang.Math)))
-
 
 ;;;; Here, the entities will have components, and
 ;;;; several functions will operate on cross-sections
@@ -170,40 +170,67 @@
 ;; Return vals of the following systems are of the form:
 ;; [id c], where c is a component or component list.
 
+(defprotocol IV2
+  (v2+ [ v1] [ v1  v2] [ v1  v2 & vs]))
+
+(deftype V2
+    [^double x ^double y]
+  IV2
+  (v2+ [ v1] ^V2 v1)
+  (v2+ [ v1  v2] ^V2 (V2. ^double (+ (.-x v1) (.-x v2))
+                                ^double (+ (.-y v1) (.-y v2))))
+  (v2+ [ v1  v2 & vs]
+    ^V2 (reduce v2+ (v2+ v1 v2) vs)))
+
+(defn return
+  "Call this to put returned components into a list!"
+  [& cpts]
+  cpts)
+
+(defn new-entity'
+  "Make a random new entity."
+  []
+  [(java.util.UUID/randomUUID)
+   {:Position (V2. 0 0)
+    :Velocity (V2. (rand) (rand))
+    :Acceleration (V2. (rand) (rand))
+    :Angle (rand Math/PI)
+    :Orientation (V2. 1.0 0.0)
+    :Spin (rand)}])
 
 (defsys update-p'
   #{:Velocity :Position}
   [[id r]]
-  (kvp id (cpt :Position (v+ (:Velocity r) (:Position r)))))
+  (return (kvp id (v2+ (:Velocity r) (:Position r)))))
 
 (defsys update-v'
   #{:Velocity :Acceleration}
   [[id r]]
-  (kvp id (cpt :Velocity (v+ (:Velocity r) (:Acceleration r)))))
+  (return (kvp id (v2+ (:Velocity r) (:Acceleration r)))))
 
 (defsys update-a'
   #{:Angle :Spin}
   [[id r]]
-  (kvp id (cpt :Angle (v+ (:Angle r) (:Spin r)))))
+  (return (kvp id (+ (:Angle r) (:Spin r)))))
 
 (defsys update-o'
   #{:Angle :Orientation}
   [[id r]]
-  (kvp id (cpt :Orientation
-               (let [a (nth (:Angle r) 0)]
-                 [(Math/cos a) (Math/sin a)]))))
+  (return (kvp id 
+               (let [a (:Angle r)]
+                 (V2. (Math/cos a) (Math/sin a))))))
 
 (defsys update-none'
   [:Angle]
   [[id r]]
-  (kvp id (:Angle r)))
+  (return (kvp id (:Angle r))))
 
 (def system-order'
-  #_[update-none']
-  [update-v'
-   update-a'
-   update-p'
-   update-o'])
+  [update-none']
+  #_[update-v'
+     update-a'
+     update-p'
+     update-o'])
 
 (defn run-systems'
   ([cm] (run-systems' system-order' cm))
@@ -227,19 +254,27 @@
   ([cm] (run-systems-single' system-order' cm))
   ([order cm]
    (reduce (fn [acc f]
-             (into acc (map f)
-                   (cross-cols acc (get-profile f))))
+             (transduce (mapcat f)
+                        conj
+                        acc
+                        (cross-cols acc (get-profile f))))
            cm order)))
 ;; LEFTOFF: How to do it??
 ;; Also, transients?
 
-#_(defn run-systems-single'!
+(defn run-systems-single'!
   "Uses transient maps!"
-  ([cm] (run-systems'! system-order' cm))
+  ([cm] (run-systems-single'! system-order' cm))
   ([order cm]
-   (reduce (fn [acc f]))))
+   (reduce (fn [acc f]
+             (persistent!
+              (transduce (mapcat f)
+                         conj!
+                         (transient acc)
+                         (cross-cols acc (get-profile f)))))
+           cm order)))
 
-(defn run-systems-nocross
+(defn run-systems-nnocross
   ([cm] (run-systems-nocross system-order' cm))
   ([order cm]
    (reduce (fn [acc f]
@@ -287,17 +322,24 @@
 
 (defn test-run'
   [num-entities bench?]
-  (let [ents (entities-to-cross-map (repeatedly num-entities new-entity))]
+  (let [ents (entities-to-cross-map (repeatedly num-entities new-entity'))]
     (if bench?
       (bench (run-systems' ents))
       (run-systems' ents))))
 
 (defn test-run-single'
   [num-entities bench?]
-  (let [ents (entities-to-cross-map (repeatedly num-entities new-entity))]
+  (let [ents (entities-to-cross-map (repeatedly num-entities new-entity'))]
     (if bench?
       (bench (run-systems-single' ents))
       (run-systems-single' ents))))
+
+(defn test-run-single'!
+  [num-entities bench?]
+  (let [ents (entities-to-cross-map (repeatedly num-entities new-entity'))]
+    (if bench?
+      (bench (run-systems-single'! ents))
+      (run-systems-single'! ents))))
 
 (defn test-run-nocross
   [order num-entities bench?]

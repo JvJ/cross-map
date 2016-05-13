@@ -42,15 +42,48 @@
   #?(:clj  (clojure.lang.MapEntry. k v)
      :cljs [k v]))
 
-(defn ky [[k _ :as kv]]
+(defn ky [kv]
   "Improved version of core/key that works on vectors."
-  {:pre [(= (count kv) 2)]}
-  k)
+  {:pre [(vector? kv) (= (count kv) 2)]}
+  (nth kv 0))
 
-(defn vl [[_ v :as kv]]
+(defn vl [kv]
   "Improved version of core/val that works on vectors."
-  {:pre [(= (count kv) 2)]}
-  v)
+  {:pre [(vector? kv) (= (count kv) 2)]}
+  (nth kv 1))
+
+;;; Map versions of set intersections/unions
+(defn munion
+  "Like merge, but keeps the original entry in
+  the case of a conflict."
+  ([m1] m1)
+  ([m1 m2]
+   (transduce (filter #(not (contains? m1 (key %))))
+              conj
+              m1
+              m2))
+  ([m1 m2 & ms]
+   (reduce munion
+           (munion m1 m2)
+           ms)))
+
+(defn mintersection
+  "Like intersection, but for maps.  Keeps
+  original entries in case of a conflict."
+  ([m1] m1)
+  ([m1 m2]
+   (let [m1-smaller? (< (count m1) (count m2))
+         m1-new (if m1-smaller? m1 m2)
+         m2-new (if m1-smaller? m2 m1)]
+     (transduce (comp (map key)
+                      (filter #(not (contains? m2-new %))))
+                dissoc
+                m1-new
+                m1-new)))
+  ([m1 m2 & ms]
+   (reduce mintersection
+           (mintersection m1 m2)
+           ms)))
 
 ;;; Memoization using volatiles.  Avoids the overhead for single-threaded uses.
 (defn vmemo [f]
@@ -80,6 +113,13 @@
     (dissoc m k)))
 
 ;;; Transient utility functions
+(defn nassoc!
+  "Like assoc!, but makes new transient maps if
+  nil is passed in."
+  [coll k v]
+  (assoc! (or coll (transient {}))
+          k v))
+
 (defn assoc-in!
   "Like assoc-in, but works only on transient maps."
   [m [k & ks] v]
