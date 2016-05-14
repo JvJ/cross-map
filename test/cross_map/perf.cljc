@@ -201,36 +201,36 @@
 (defsys update-p'
   #{:Velocity :Position}
   [[id r]]
-  (return (kvp id (v2+ (:Velocity r) (:Position r)))))
+  (return (kvp [id :Position] (v2+ (:Velocity r) (:Position r)))))
 
 (defsys update-v'
   #{:Velocity :Acceleration}
   [[id r]]
-  (return (kvp id (v2+ (:Velocity r) (:Acceleration r)))))
+  (return (kvp [id :Velocity] (v2+ (:Velocity r) (:Acceleration r)))))
 
 (defsys update-a'
   #{:Angle :Spin}
   [[id r]]
-  (return (kvp id (+ (:Angle r) (:Spin r)))))
+  (return (kvp [id :Angle] (+ (:Angle r) (:Spin r)))))
 
 (defsys update-o'
   #{:Angle :Orientation}
   [[id r]]
-  (return (kvp id 
+  (return (kvp [id :Orientation] 
                (let [a (:Angle r)]
                  (V2. (Math/cos a) (Math/sin a))))))
 
 (defsys update-none'
   [:Angle]
   [[id r]]
-  (return (kvp id (:Angle r))))
+  (return (kvp [id :Angle] (:Angle r))))
 
 (def system-order'
-  [update-none']
-  #_[update-v'
-     update-a'
-     update-p'
-     update-o'])
+  #_[update-none']
+  [update-v'
+   update-a'
+   update-p'
+   update-o'])
 
 (defn run-systems'
   ([cm] (run-systems' system-order' cm))
@@ -259,8 +259,6 @@
                         acc
                         (cross-cols acc (get-profile f))))
            cm order)))
-;; LEFTOFF: How to do it??
-;; Also, transients?
 
 (defn run-systems-single'!
   "Uses transient maps!"
@@ -274,7 +272,7 @@
                          (cross-cols acc (get-profile f)))))
            cm order)))
 
-(defn run-systems-nnocross
+(defn run-systems-nocross
   ([cm] (run-systems-nocross system-order' cm))
   ([order cm]
    (reduce (fn [acc f]

@@ -1,5 +1,5 @@
-(defproject com.jvj/cross-map "0.1.0-SNAPSHOT"
-  :description "Two-dimensional map with efficient cross-section capabilities."
+(defproject com.jvj/cross-map "0.2.0-SNAPSHOT"
+  :description "Two-dimensional makp with efficient cross-section capabilities."
   :url "https://github.com/JvJ/cross-map"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}

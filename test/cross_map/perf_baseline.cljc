@@ -1,6 +1,8 @@
 (ns cross-map.perf-baseline
   "Some general performance tests to compare others against."
   (:require [criterium.core :as cri :refer [bench benchmark]]
+            [cross-map.util :as u :refer [new-uuid]]
+            [cross-map.core :as cmc :refer [cross-map cross-cols cols rows]]
             #?(:clj [clojure.test :as t]
                 :cljs [cljs.test :as t :include-macros true])))
 
@@ -191,3 +193,82 @@
     (bench (reduce vv+ v2v-list))
     (println "Just Doubles:")
     (bench (reduce + nums))))
+
+
+;;; Testing reassoc on cross-maps
+;;; Test columns will be the smaller set, as is usual
+(def test-cols-probs
+  "The test columns for the cross-map reassoc tests.
+  The numbers represent the likelihood of a row having
+  this column."
+  {:A 1.0 :B 1.0 :C 0.9
+   :D 0.5 :E 0.25 :F 0.25 :G 0.1})
+
+(defn new-row
+  [idx ps]
+  (transduce (filter (fn [[k v]] (< (rand) v)))
+             (fn
+               ([acc] acc)
+               ([acc [k v]]
+                (assoc acc [idx k] (keyword (str k "_" idx)))))
+             {}
+             ps))
+
+(defn gen-test-map
+  "For the test rows, the row ID is a uuid."
+  ([n] (gen-test-map n test-cols-probs))
+  ([n ps]
+   (->> (range n)
+        (mapcat #(new-row % ps))
+        (into (cross-map)))))
+
+(defn cross-reassoc-tests
+  "It crosses the cols on all adjacent pairs of elements and
+  reassociates thir kvp's into the cross map"
+  ([n] (cross-reassoc-tests n test-cols-probs))
+  ([n ps]
+   (let [parts (vec (partition 2 1 (keys ps)))
+         cmap (gen-test-map n ps)]
+     ;; Normal
+     (println "Persistent: ")
+     (bench
+      (reduce (fn [acc [c1 c2]]
+                (reduce (fn [acc' [idx r]]
+                          (-> acc'
+                              (dissoc [idx c1])
+                              (assoc [idx c1] (r c1))
+                              (dissoc [idx c2])
+                              (assoc [idx c2] (r c2))))
+                        acc
+                        (cross-cols acc [c1 c2])))
+              cmap
+              parts))
+     ;; Transient
+     (println "Transient: ")
+     (bench
+      (reduce (fn [acc [c1 c2]]
+                (persistent!
+                 (reduce (fn [acc' [idx r]]
+                           (-> acc'
+                               (dissoc! [idx c1])
+                               (assoc! [idx c1] (r c1))
+                               (dissoc! [idx c2])
+                               (assoc! [idx c2] (r c2))))
+                         (transient acc)
+                         (cross-cols acc [c1 c2]))))
+              cmap
+              parts)))))
+
+(defn flip-flop-test
+  "Testing how quickly a persistent cross-map can
+  flip-flop between persistent and transient."
+  ([num-flips map-size] (flip-flop-test num-flips map-size test-cols-probs))
+  ([num-flips map-size ps]
+   (let [cm (gen-test-map map-size ps)
+         plain-map (into {} cm)]
+     (println "Plain maps:")
+     (bench (dotimes [i num-flips]
+              (persistent! (transient plain-map))))
+     (println "Cross maps:")
+     (bench (dotimes [i num-flips]
+              (persistent! (transient cm)))))))

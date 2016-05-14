@@ -365,10 +365,10 @@
      (asTransient [this]
        (transient-cross-map (transient mainMap)
                             (transient rowIdx)
-                            (transient (reduce-kv (fn [acc k v]
-                                                    (assoc acc k (transient v)))
-                                                  colIdx
-                                                  colIdx))))
+                            (reduce-kv (fn [acc k v]
+                                         (assoc! acc k (transient v)))
+                                       (transient colIdx)
+                                       colIdx)))
      
      MapEquivalence
 
@@ -525,31 +525,22 @@
        (when-let [[r c] (and (pair? k) k)]
          (set! !rowIdx (assoc! !rowIdx r
                                (let [rw (or (!rowIdx r) {})]
-                                 (assoc-in rw [r c] v))))
+                                 (assoc rw c v))))
          (set! !colIdx (assoc! !colIdx c
                                (let [!cl (or (!colIdx c) (transient {}))]
-                                 (assoc! !cl r
-                                         (assoc (!cl r) c v))))))
+                                 (assoc! !cl r v)))))
        this)
      
      (without [this k]
        (set! !mainMap (dissoc! !mainMap k))
        (when-let [[r c] (and (pair? k) k)]
          (set! !rowIdx (let [rw (!rowIdx r)
-                             rwc (rw c)
-                             rwc (and rwc (dissoc rwc c))
-                             res (if (empty? rwc)
-                                   (dissoc rw c)
-                                   (assoc rw c rwc))]
+                             res (dissoc rw c)]
                          (if (empty? res)
                            (dissoc! !rowIdx r)
-                           (assoc! !rowIdx r res)))) 
+                           (assoc! !rowIdx r res))))
          (set! !colIdx (let [!cl (!colIdx c)
-                             clr (!cl r)
-                             clr (and clr (dissoc clr r))
-                             res (if (empty? clr)
-                                   (dissoc! !cl r)
-                                   (assoc! !cl r clr))]
+                             res (dissoc! !cl r)]
                          (if (= 0 (count res))
                            (dissoc! !colIdx c)
                            (assoc! !colIdx c res)))))
@@ -558,10 +549,14 @@
      (persistent [this]
        (let [ri (persistent! !rowIdx)
              ci (persistent! !colIdx)
-             ci (reduce-kv (fn [acc k v]
-                             (assoc acc k (persistent! v)))
-                           ci
-                           ci)]
+             ks (keys ci)
+             ci (transient ci)
+             ci (reduce (fn [acc k]
+                          (assoc! acc k
+                                  (persistent! (acc k))))
+                        ci
+                        ks)
+             ci (persistent! ci)]
          (PersistentCrossMap. (persistent! !mainMap)
                               ri
                               ci)))
